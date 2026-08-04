@@ -1,0 +1,17 @@
+python-ffmpeg 
+numpy
+pandas
+faiss-cpu
+fastapi
+torch
+pydantic
+uvicorn
+gzip
+torchvision
+tqdm
+transformers==5.4.0
+unidecode
+requests
+elasticsearch==9.1.0
+deep-translator==1.11.4
+google-genai==2.14.0
