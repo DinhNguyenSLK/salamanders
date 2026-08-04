@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Video Player</title>
+  <link href="https://vjs.zencdn.net/7.18.1/video-js.css" rel="stylesheet" />
+  <script src="https://vjs.zencdn.net/7.18.1/video.min.js"></script>
+  <script src="js/jquery-3.3.1.min.js"></script>
+  <script src="js/js-yaml.min.js"></script>
+  <script src="js/visione.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 12px;
+      font-family: Consolas, "Courier New", monospace;
+      background: #1a1a1a;
+      color: #e8e8e8;
+    }
+    #videoWrap {
+      position: relative;
+      display: inline-block;
+      max-width: 100%;
+    }
+    .video-js {
+      width: 640px;
+      height: 480px;
+      background: #000;
+    }
+    /* Hiện rõ current / duration trên control bar */
+    .video-js .vjs-current-time,
+    .video-js .vjs-duration,
+    .video-js .vjs-time-divider {
+      display: block !important;
+    }
+    .video-js .vjs-time-control {
+      min-width: 2.5em;
+      padding-left: 0.5em;
+      padding-right: 0.5em;
+    }
+    #frameHud {
+      margin-top: 10px;
+      padding: 10px 12px;
+      background: #111;
+      border: 1px solid #333;
+      border-radius: 4px;
+      line-height: 1.5;
+      user-select: none;
+    }
+    #frameHud .label { color: #888; }
+    #frameHud .value { color: #7dffa0; font-weight: bold; }
+    #frameHud .hint {
+      margin-top: 6px;
+      color: #666;
+      font-size: 12px;
+    }
+    #actions { margin-top: 10px; }
+    #submit {
+      padding: 8px 14px;
+      cursor: pointer;
+      background: #c47a00;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    #submit:hover { background: #e09010; }
+  </style>
+</head>
+
+<body>
+  <script type="text/javascript">
+    function checkQA() {
+      let isQA = localStorage.getItem('taskType') === 'qa' ? true : false;
+      if (isQA) submitQA();
+      return isQA;
+    }
+
+    $.urlParam = function(name) {
+      var results = new RegExp('[\\?&]' + name + '=([^&#]*)')
+        .exec(window.location.href);
+      return results ? decodeURIComponent(results[1]) : 0;
+    }
+
+    function submitAtCurrentPlayTime() {
+      myPlayer.pause();
+      var whereYouAt = myPlayer.currentTime();
+      videoid = $.urlParam('videoid');
+      if (submitAlert()) {
+        res = submitAtTime(videoid, whereYouAt);
+        console.log(res);
+        alert('Server response: ' + res);
+      }
+    }
+  </script>
+
+  <div id="videoWrap">
+    <video
+      id="vbsvideo"
+      class="video-js vjs-big-play-centered"
+      controls
+      preload="auto"
+      width="640"
+      height="480"
+      playsinline
+    ></video>
+  </div>
+
+  <div id="frameHud">
+    <div>
+      <span class="label">Frame (ffmpeg): </span>
+      <span class="value" id="frameIndex">—</span>
+      <span class="label"> &nbsp;|&nbsp; Time: </span>
+      <span class="value" id="timeValue">—</span>
+      <span class="label"> &nbsp;|&nbsp; Duration: </span>
+      <span class="value" id="durationValue">—</span>
+      <span class="label"> &nbsp;|&nbsp; FPS: </span>
+      <span class="value" id="fpsValue">—</span>
+    </div>
+    <div class="hint">Cuộn chuột trên video: lên = tua tới (+1 frame), xuống = tua lui (−1 frame)</div>
+  </div>
+
+  <div id="actions">
+    <button id="submit"
+      title="Submit result at current play time"
+      onclick="if (!checkQA()) submitAtCurrentPlayTime();">
+      Submit
+    </button>
+  </div>
+
+<script type="text/javascript">
+  var myPlayer;
+  var videoFps = 25;
+  var hudRaf = null;
+
+  function padFrame(n) {
+    var s = String(Math.max(0, n | 0));
+    return s.length >= 5 ? s : ("00000" + s).slice(-5);
+  }
+
+  function formatClock(sec) {
+    if (!isFinite(sec) || sec < 0) return "—";
+    var s = Math.floor(sec % 60);
+    var m = Math.floor((sec / 60) % 60);
+    var h = Math.floor(sec / 3600);
+    var ss = (s < 10 ? "0" : "") + s;
+    var mm = (m < 10 ? "0" : "") + m;
+    if (h > 0) return h + ":" + mm + ":" + ss;
+    return mm + ":" + ss;
+  }
+
+  function ffmpegFrameIndex(timeSec, fps) {
+    if (!isFinite(timeSec) || !isFinite(fps) || fps <= 0) return 0;
+    return Math.max(0, Math.round(timeSec * fps));
+  }
+
+  function timeFromFrame(frameIdx, fps) {
+    return frameIdx / fps;
+  }
+
+  function updateHud() {
+    if (!myPlayer) return;
+    var t = myPlayer.currentTime() || 0;
+    var d = myPlayer.duration();
+    var frame = ffmpegFrameIndex(t, videoFps);
+    document.getElementById("frameIndex").textContent = padFrame(frame);
+    document.getElementById("timeValue").textContent =
+      t.toFixed(3) + "s (" + formatClock(t) + ")";
+    document.getElementById("durationValue").textContent =
+      isFinite(d) && d > 0
+        ? d.toFixed(3) + "s (" + formatClock(d) + ")"
+        : "—";
+    document.getElementById("fpsValue").textContent = String(videoFps);
+  }
+
+  function startHudLoop() {
+    function tick() {
+      updateHud();
+      hudRaf = requestAnimationFrame(tick);
+    }
+    if (hudRaf) cancelAnimationFrame(hudRaf);
+    hudRaf = requestAnimationFrame(tick);
+  }
+
+  function seekByFrames(deltaFrames) {
+    if (!myPlayer) return;
+    myPlayer.pause();
+    var t = myPlayer.currentTime() || 0;
+    var frame = ffmpegFrameIndex(t, videoFps) + deltaFrames;
+    if (frame < 0) frame = 0;
+    var duration = myPlayer.duration();
+    var newTime = timeFromFrame(frame, videoFps);
+    if (isFinite(duration) && duration > 0) {
+      var maxFrame = ffmpegFrameIndex(duration, videoFps);
+      if (frame > maxFrame) {
+        frame = maxFrame;
+        newTime = timeFromFrame(frame, videoFps);
+      }
+      if (newTime > duration) newTime = Math.max(0, duration - 0.001);
+    }
+    myPlayer.currentTime(newTime);
+    updateHud();
+  }
+
+  function onWheelSeek(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    var delta = e.deltaY < 0 ? 1 : e.deltaY > 0 ? -1 : 0;
+    if (delta === 0) return;
+    seekByFrames(delta);
+  }
+
+  function loadPage() {
+    var url = $.urlParam("url");
+    var t = parseFloat($.urlParam("t"));
+    var frameID = $.urlParam("frameid");
+    var videoId = $.urlParam("videoid");
+
+    if (frameID) {
+      try {
+        log('{"query":[{"videoplayer":"' + frameID + '"}], "parameters":[{}]}');
+      } catch (err) {}
+    }
+
+    var fpsRaw = getFps(videoId);
+    var parsedFps = parseFloat(fpsRaw);
+    if (isFinite(parsedFps) && parsedFps > 0) {
+      videoFps = parsedFps;
+    }
+
+    var seekTime = t;
+    if (frameID) {
+      var selected = parseFloat(getField(frameID, "selectedtime"));
+      if (isFinite(selected) && selected >= 0) seekTime = selected;
+    }
+    if (!isFinite(seekTime) || seekTime < 0) seekTime = 0;
+
+    // Không dùng data-setup — tránh init Video.js 2 lần (gây lỗi nút play/pause)
+    myPlayer = videojs("vbsvideo", {
+      controls: true,
+      preload: "auto",
+      autoplay: false,
+      muted: true,
+      fluid: false,
+      controlBar: {
+        children: [
+          "playToggle",
+          "volumePanel",
+          "currentTimeDisplay",
+          "timeDivider",
+          "durationDisplay",
+          "progressControl",
+          "fullscreenToggle",
+        ],
+      },
+    });
+
+    myPlayer.src({ type: "video/mp4", src: url });
+
+    function startAtSeek() {
+      var duration = myPlayer.duration();
+      if (isFinite(duration) && duration > 0 && seekTime > duration) {
+        seekTime = Math.max(0, duration - 0.001);
+      }
+      myPlayer.currentTime(seekTime);
+      updateHud();
+      var playPromise = myPlayer.play();
+      if (playPromise && typeof playPromise.catch === "function") {
+        playPromise.catch(function () {
+          // Autoplay bị chặn — giữ trạng thái pause, nút play vẫn dùng được
+        });
+      }
+    }
+
+    myPlayer.one("loadedmetadata", function () {
+      startAtSeek();
+      startHudLoop();
+    });
+
+    // Fallback nếu metadata đã sẵn / event đã qua
+    myPlayer.ready(function () {
+      if (myPlayer.readyState() >= 1) {
+        startAtSeek();
+        startHudLoop();
+      }
+
+      // Wheel chỉ trên vùng video, không chặn control bar
+      var techEl = myPlayer.el().querySelector(".vjs-tech");
+      if (techEl) {
+        techEl.addEventListener("wheel", onWheelSeek, { passive: false });
+      }
+      document
+        .getElementById("frameHud")
+        .addEventListener("wheel", onWheelSeek, { passive: false });
+    });
+
+    myPlayer.on("seeked", updateHud);
+    myPlayer.on("timeupdate", updateHud);
+    myPlayer.on("durationchange", updateHud);
+    myPlayer.on("play", updateHud);
+    myPlayer.on("pause", updateHud);
+  }
+
+  loadConfig().then(loadPage);
+</script>
+</body>
+</html>

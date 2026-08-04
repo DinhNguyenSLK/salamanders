@@ -1,0 +1,38 @@
+# Python
+**/__pycache__/
+cli/
+test_data/
+visione/
+**/target/
+
+**/frame_extractor/
+# Virtual enviroment
+venv/
+.env/
+.venv/
+app/.env
+
+# IDE
+.vscode/
+.idea/
+
+# Dataset
+collection_dir/
+data/
+database/
+dataset/
+encoded_str/
+features/
+lucene-index/
+raw_objects/
+prj/
+services/
+
+
+*.gz
+*.png
+*.webp
+*.jpg
+*.txt
+*.hdf5
+*.zip

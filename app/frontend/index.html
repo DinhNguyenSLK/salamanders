@@ -1,0 +1,242 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="task" content="KIS" />
+    <meta name="dataset" content="v3c" />
+
+    <title>Salamanders</title>
+    <link rel="stylesheet" href="css/jquery-ui.min.css" />
+    <link rel="stylesheet" href="css/fontawesome.min.css" />
+    <link rel="stylesheet" href="css/bootstrap.css" />
+    <link rel="stylesheet" href="css/visione.css?v=12" />
+    <link rel="stylesheet" href="css/queryByExample.css?v=4" />
+    <link rel="stylesheet" href="css/toggle.css" />
+  </head>
+
+  <body class="advanced-mode" oncontextmenu="return false;">
+    <div id="content" class="containerGrid">
+      <div class="bodyGrid">
+        <div class="sidebarGrid" id="searchSidebar">
+          <button
+            type="button"
+            id="sidebarToggle"
+            class="sidebar-toggle"
+            title="Ẩn / hiện thanh công cụ"
+            onclick="toggleSidebar()"
+            aria-expanded="true"
+            aria-controls="searchSidebar"
+          >
+            <i class="fa fa-chevron-left" aria-hidden="true"></i>
+          </button>
+          <div class="sidebar-inner">
+            <div class="sidebar-header">
+              <div class="task_bounding-box">
+                <div class="top-line"></div>
+                <span class="task-text">Task</span>
+                <label class="radio-label">
+                  <input
+                    type="radio"
+                    name="option"
+                    value="kis"
+                    onclick="setTaskType('kis')"
+                  />
+                  KIS
+                </label>
+                <label class="radio-label">
+                  <input
+                    type="radio"
+                    name="option"
+                    value="avs"
+                    onclick="setTaskType('avs')"
+                  />
+                  AVS
+                </label>
+                <label class="radio-label">
+                  <input
+                    type="radio"
+                    name="option"
+                    value="qa"
+                    onclick="setTaskType('qa')"
+                  />
+                  Q&A
+                </label>
+              </div>
+
+              <div class="sidebar-header-controls">
+                <div class="video-type-control">
+                  <label for="videoTypeSelect" class="ctrl-label"
+                    >Video type</label
+                  >
+                  <select
+                    id="videoTypeSelect"
+                    onchange="setVideoType(this.value)"
+                  ></select>
+                </div>
+
+                <div class="k-slider-control">
+                  <label for="kSlider" class="ctrl-label"
+                    >K = <span id="kValue">1000</span></label
+                  >
+                  <input
+                    id="kSlider"
+                    type="range"
+                    min="100"
+                    max="10000"
+                    step="100"
+                    value="1000"
+                    oninput="setTopK(this.value, false)"
+                  />
+                </div>
+              </div>
+
+              <div id="visionelogo" class="sidebar-brand">
+                <a href=""
+                  ><img
+                    id="visionelogoImg"
+                    src="img/logoVISIONE.png"
+                    alt=""
+                    title="Restart"
+                    onclick="startNewKISSession()"
+                /></a>
+              </div>
+
+              <div id="dialog" title="Tag Name" style="display: none">
+                <label>tag</label> <input id="tag" name="tag" type="text" />
+              </div>
+            </div>
+
+            <div class="sidebar-fixed">
+              <div id="objectIconsPanel" class="object-icons-panel">
+                <div class="object-icons-header">
+                  <span class="object-icons-title">Object icons</span>
+                  <button
+                    type="button"
+                    id="objectIconsToggle"
+                    class="object-icons-toggle"
+                    aria-expanded="true"
+                    aria-controls="paletteContainer"
+                    title="Thu gọn / mở rộng vùng icon object"
+                  >
+                    <i class="fa fa-chevron-up" aria-hidden="true"></i>
+                  </button>
+                </div>
+                <div id="paletteContainer" class="palette-container">
+                  <div id="palette" class="palette"></div>
+                </div>
+              </div>
+              <div id="mainSearchBox"></div>
+            </div>
+            <div class="sidebar-scroll">
+              <div id="searchTab"></div>
+              <div
+                id="qbe"
+                w3-include-html="filters.html"
+                class="font-normal"
+              ></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="contentGrid" id="resultsContent">
+          <div id="loading-spinner">
+            <i class="fas fa-spinner fa-spin"></i>
+          </div>
+          <div id="avsSelected" class="avsSelected">
+            <div id="avsTab" style="display: block" class=""></div>
+          </div>
+          <div id="resGrid" class="resGrid">
+            <div id="results" class="resGrid2">
+              <div id="imgGridResults" class="gridcontainer"></div>
+            </div>
+            <ol id="recordingsList"></ol>
+          </div>
+        </div>
+        <div class="rightSidebarGrid" id="submitted_bar" style="display: none">
+          <div style="color: green">
+            Submitted: <b id="submitted_num" style="color: red"></b>
+          </div>
+          <div id="avsSubmittedTab"></div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="imagePreviewModal"
+      class="image-preview-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="imagePreviewModalTitle"
+      hidden
+    >
+      <div class="image-preview-modal-backdrop" data-image-preview-close></div>
+      <div class="image-preview-modal-content">
+        <h2 id="imagePreviewModalTitle" class="sr-only">Generated image preview</h2>
+        <div class="image-preview-modal-actions">
+          <a
+            id="imagePreviewDownload"
+            class="image-preview-modal-action"
+            href="#"
+            download="generated-image.png"
+            title="Download image"
+            aria-label="Download image"
+          >
+            <i class="fa fa-download" aria-hidden="true"></i>
+          </a>
+          <button
+            type="button"
+            id="imagePreviewClose"
+            class="image-preview-modal-action"
+            title="Close preview"
+            aria-label="Close preview"
+            data-image-preview-close
+          >
+            <i class="fa fa-times" aria-hidden="true"></i>
+          </button>
+        </div>
+        <img id="imagePreviewModalImage" alt="Generated image preview" />
+      </div>
+    </div>
+
+    <script src="js/jquery-3.3.1.min.js"></script>
+    <script src="js/jquery-ui.min.js"></script>
+    <script src="js/fabric.js"></script>
+    <script src="js/js-yaml.min.js"></script>
+    <script src="js/queryByExample.js?v=4"></script>
+    <script src="js/visione.js?v=15"></script>
+    <script src="js/visioneAVS.js"></script>
+    <script src="js/canvas.js?v=5"></script>
+    <script src="js/search_bar_templates.js?v=11"></script>
+    <script>
+      init().catch(function (err) {
+        console.error("init failed:", err);
+      });
+
+      const channel = new BroadcastChannel("app-data");
+      channel.addEventListener("message", (event) => {
+        window.focus();
+
+        let frameData = event.data.split(",");
+        let imgId = frameData[0];
+        let videoId = frameData[1];
+        let collection = frameData[2];
+
+        console.log(event.data);
+        let path = collection + "/" + videoId + "/" + imgId;
+
+        let avsObj = getAvsObj(
+          collection,
+          videoId,
+          imgId,
+          "avs_" + imgId,
+          thumbnailUrl + path,
+          keyFramesUrl + path,
+          null,
+          null,
+        );
+
+        unifiedSubmit(avsObj, null);
+      });
+    </script>
+  </body>
+</html>

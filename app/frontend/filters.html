@@ -1,0 +1,25 @@
+<div id="filter" class="qbe-panel">
+	<div class="qbe-title">Query by example</div>
+	<div class="qbe-tabs">
+		<button type="button" id="urlTabBtn" class="qbe-tab active" onclick="changeQueryBySampleMod('url')">Paste URL</button>
+		<button type="button" id="uploadTabBtn" class="qbe-tab" onclick="changeQueryBySampleMod('upload')">Upload</button>
+	</div>
+	<div class="qbe-body">
+		<input type="hidden" value="" id="objId">
+		<input id="urlToUpload" name="url" type="text" class="qbe-input" placeholder="https://example.com/image.jpg"
+			onkeydown="if(event.key==='Enter'){event.preventDefault();queryImg();}">
+		<label id="imageToUploadLabel" class="qbe-file-label" style="display: none;">
+			<input id="imageToUpload" name="imgFile" type="file" accept="image/*">
+			<span>Choose image…</span>
+		</label>
+		<button type="button" id="queryByExample" class="qbe-search-btn" title="Search" onclick="queryImg(); return false;">
+			<i class="fa fa-search"></i> Search
+		</button>
+	</div>
+	<div class="preview qbe-preview" id="qbeblock" style="display: none;">
+		<img src="" id="qbeImg" alt="query preview">
+		<button type="button" id="removeqbe" class="qbe-remove" title="remove" onclick="resetQueryImg()">
+			<i class="fa fa-times"></i>
+		</button>
+	</div>
+</div>
