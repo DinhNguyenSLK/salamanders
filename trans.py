@@ -18,3 +18,6 @@ for video_path in video_list:
     duration = get_video_duration(str(video_path))
     total_frames += duration
 print(f"Tổng số frame trong tất cả video: {total_frames}")
+
+kf = list(Path("./collection_dir/selected-frames").glob("*/*.jpg"))
+print(f"Tổng số keyframe đã extract: {len(kf)}")

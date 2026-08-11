@@ -1,5 +1,6 @@
 from pathlib import Path
-
+import gzip
+import json
 
 def augment_keyframes(txt_file: str | Path, K: int):
     txt_file = Path(txt_file)
@@ -54,6 +55,7 @@ def remove_frames_before(txt_file: str | Path, K: int):
     txt_file = Path(txt_file)
 
     lines = []
+    c = 0
     with open(txt_file, "r") as f:
         for line in f:
             parts = list(map(int, line.split()))
@@ -61,16 +63,48 @@ def remove_frames_before(txt_file: str | Path, K: int):
             shot_id, frames = parts[0], parts[1:]
 
             while frames and frames[0] <= K:
+                c += 1
                 frames.pop(0)
 
             lines.append((shot_id, frames))
-
+    print(f"Removed {c} keyframes from {txt_file.stem} that were <= {K}.")
     with open(txt_file, "w") as f:
         for shot_id, frames in lines:
             f.write(f"{shot_id}{' ' if frames else ''}{' '.join(map(str, frames))}\n")
+
+def generate_tag_empty(video_id = 'L25'):
+
+    output_dir = Path('./collection_dir/empty_tags')
+    
+
+    d = {}
+
+    for empty_tags in sorted(Path('./collection_dir/selected-frames').glob('L25_*/L25_V*.jpg')):
+
+        video_id = empty_tags.parent.name
+
+        if video_id not in d:
+            d[video_id] = []
+
+        d[video_id].append({
+            '_id': empty_tags.stem,
+            'tags':[]
+        })
+
+    for video_id, records in d.items():
+
+        out = output_dir / video_id / f'{video_id}-tags.jsonl.gz'
+        out.parent.mkdir(parents=True)
+
+
+        with gzip.open(out, 'wt') as f:
+            for record in records:
+                f.write(json.dumps(record) + "\n")
+
+    
 if __name__ == "__main__":
     # python processing_keyframes_info.py
-    
-    for file_path in sorted(list(Path("./collection_dir/keyframes-info/L23").glob("*-keyframes.txt"))):
-        augment_keyframes(file_path, 35)
+    generate_tag_empty()
+    # for file_path in sorted(list(Path("./collection_dir/keyframes-info/L22").glob("*-keyframes.txt"))):
+    #     remove_frames_before(file_path, 370)
     

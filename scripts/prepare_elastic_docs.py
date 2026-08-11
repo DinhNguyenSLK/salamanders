@@ -71,59 +71,122 @@ class PrepareElasticDocs:
                 continue
         raise ValueError(f"Khong doc duoc file {json_path}")
     
-    def find_image_info(self, scene_data, media_info_data, asr_data, frame_id):
-
-        fps = media_info_data['fps']
+    def find_image_info(
+                    self,
+                    scene_data,
+                    media_info_data,
+                    asr_data,
+                    frame_id,
+                    video_id=None
+                ):
+        fps = float(media_info_data['fps'])
         video_type = media_info_data['video_type']
-        desc = media_info_data['description']
         title = unidecode(media_info_data['title'].lower().strip())
         published_date = media_info_data['publish_date']
 
         low = 0
         high = len(scene_data) - 1
 
+        # Scene tìm thấy trực tiếp
+        matched_scene = None
+
+        # Hai scene lân cận nếu frame bị gap
+        prev_scene = None
+        next_scene = None
+
         while low <= high:
             mid = (low + high) // 2
 
-            row = scene_data[mid]    
+            row = scene_data[mid]
+
             start_fr = int(row['start_frame'])
             end_fr = int(row['end_frame'])
 
             if start_fr <= frame_id <= end_fr:
-                
-                start_seconds = float(row['start_seconds'])
-                end_seconds = float(row['end_seconds'])
+                matched_scene = row
+                break
 
-                selected_time = round(float(frame_id)/fps, 3)
-
-                middle_fr = int(start_fr + end_fr) // 2
-                middle_time = round(float(start_seconds + end_seconds) / 2, 3)
-
-                return {
-                    "video_type": video_type,
-                    
-                    "title": title,
-                    "published_date": published_date,
-
-                    "startframe": start_fr,
-                    "endframe": end_fr,
-                    "middleframe": middle_fr,
-                    "selectedframe":frame_id,
-                    "starttime": start_seconds,
-                    "endtime": end_seconds,
-                    "middletime": middle_time,
-                    "selectedtime": selected_time,
-
-                    "asr": self.find_asr_content(asr_data, selected_time)
-                }
-            
             elif frame_id < start_fr:
+                # Scene hiện tại nằm phía sau frame_id
+                next_scene = row
                 high = mid - 1
 
             else:
+                # Scene hiện tại nằm phía trước frame_id
+                prev_scene = row
                 low = mid + 1
 
-        raise ValueError(f"Khong tim thay thong tin cho frame_id {frame_id} trong scene_data")
+        # Không tìm thấy scene chứa frame -> chọn scene gần nhất
+        if matched_scene is None:
+
+            if prev_scene is None and next_scene is None:
+                raise ValueError(
+                    f"Không có scene nào cho {video_id=}, {frame_id=}"
+                )
+
+            elif prev_scene is None:
+                matched_scene = next_scene
+
+            elif next_scene is None:
+                matched_scene = prev_scene
+
+            else:
+                prev_end = int(prev_scene['end_frame'])
+                next_start = int(next_scene['start_frame'])
+
+                prev_distance = frame_id - prev_end
+                next_distance = next_start - frame_id
+
+                if prev_distance <= next_distance:
+                    matched_scene = prev_scene
+                else:
+                    matched_scene = next_scene
+
+            # Có thể log để biết những frame nào bị gap
+            if video_id is not None:
+                print(
+                    f"[Scene gap] {video_id}: "
+                    f"frame={frame_id} -> "
+                    f"scene={matched_scene['start_frame']}-"
+                    f"{matched_scene['end_frame']}"
+                )
+
+        # --------------------------------------------------
+        # Xử lý scene đã chọn
+        # --------------------------------------------------
+
+        start_fr = int(matched_scene['start_frame'])
+        end_fr = int(matched_scene['end_frame'])
+
+        start_seconds = float(matched_scene['start_seconds'])
+        end_seconds = float(matched_scene['end_seconds'])
+
+        selected_time = frame_id / fps
+
+        middle_fr = (start_fr + end_fr) // 2
+        middle_time = (start_seconds + end_seconds) / 2
+
+        return {
+            "video_type": video_type,
+
+            "title": title,
+            "published_date": published_date,
+
+            "startframe": start_fr,
+            "endframe": end_fr,
+            "middleframe": middle_fr,
+            "selectedframe": frame_id,
+
+            "starttime": start_seconds,
+            "endtime": end_seconds,
+            "middletime": round(middle_time, 3),
+            "selectedtime": round(selected_time, 3),
+
+            "asr": self.find_asr_content(
+                asr_data,
+                selected_time
+            )
+        }
     
     def process_ocr_data(self, record):
         """
@@ -146,7 +209,7 @@ class PrepareElasticDocs:
         replace space with underscore and convert to lower case
         """
         tag_data = record.get('tags', [])
-        tag_data = [tag.replace(' ', '_').strip() for tag in tag_data if tag]
+        tag_data = [tag.lower().replace(' ', '_').strip() for tag in tag_data if tag]
         record['tags'] = tag_data
         return record
 
@@ -154,12 +217,12 @@ class PrepareElasticDocs:
 
         elastic_doc_file = Path(self.output_template.format(video_id=video_id))
         
-        scene_file = self.collection_dir / 'selected-frames' / video_id / f'{video_id}-scenes.csv'
+        scene_file = self.collection_dir / 'scene-info' /  video_id.split("_")[0] / f'{video_id}-scenes.csv'
         media_info_file = self.collection_dir / 'media-info' / f'{video_id}.json'
         str_object_file = self.collection_dir / 'str-objects' / video_id / f'{video_id}-str-objects.jsonl.gz'
         ocr_object_file = self.collection_dir / 'objects-ocr' / video_id / f'{video_id}-objects-ocr.jsonl.gz'
 
-        asr_file = self.collection_dir / 'asr'/ f'{video_id}-asr.csv'
+        asr_file = self.collection_dir / 'asr'/ video_id.split("_")[0] / f'{video_id}-asr.csv'
         object_tag_file = self.collection_dir / 'objects-tags' / video_id / f'{video_id}-tags.jsonl.gz'
 
         media_data = self.load_json(json_path = media_info_file)
@@ -202,15 +265,15 @@ class PrepareElasticDocs:
             record['videoID'] = video_id
             record['collection'] = 'collection'
 
-            scene_info = self.find_image_info(scene_data, media_data, asr_data, frame_id)
+            scene_info = self.find_image_info(scene_data, media_data, asr_data, frame_id, video_id)
             record.update(scene_info)
 
             record['object_pos'] = data['object_box_str']
-            record['object_count'] = data.pop('object_count_str')
-            record['objectsinfo'] = data.pop('object_info')
+            record['object_count'] = data['object_count_str']
+            record['objectsinfo'] = data['object_info']
 
-            record['ocr'] = data.pop('ocr')
-            record['tags'] = data.pop('tags')
+            record['ocr'] = data['ocr']
+            record['tags'] = data['tags']
 
             records.append(record)
         
@@ -220,7 +283,7 @@ class PrepareElasticDocs:
     
     def prepare_all_docs(self):
 
-        for video_id in tqdm(self.video_ids, desc="Đang chuẩn bị docs cho elastic: "):
+        for video_id in tqdm(sorted(self.video_ids), desc="Đang chuẩn bị docs cho elastic: "):
 
             self.prepare_elastic_doc(video_id)
         print(f'Hoàn tất chuẩn bị {len(self.video_ids)} docs')

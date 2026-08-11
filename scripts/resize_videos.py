@@ -52,14 +52,14 @@ class VideoResizer:
             '-map', '[tinyv]',
             '-map', '0:a?',
             '-fps_mode', 'passthrough',
-            '-c:v', 'libx264', '-preset', 'medium', '-crf', '25', '-movflags', '+faststart',  # slower: encode chậm, file nhỏ hơn
+            '-c:v', 'libx264', '-preset', 'superfast', '-crf', '25', '-movflags', '+faststart',  # slower: encode chậm, file nhỏ hơn
             '-c:a', 'aac', '-b:a', '128k',
             str(output_tiny),
 
             '-map', '[medv]',
             '-map', '0:a?',
             '-fps_mode', 'passthrough',
-            '-c:v', 'libx264', '-preset', 'medium', '-crf', '30', '-movflags', '+faststart',
+            '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '30', '-movflags', '+faststart',
             '-c:a', 'aac', '-b:a', '128k',
             str(output_medium),
         ]

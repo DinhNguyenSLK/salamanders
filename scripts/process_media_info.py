@@ -14,8 +14,17 @@ class PreprocessingMetadata:
         self.video_dir = video_dir
         self.rule = {
             "L21" : "news",
-            "L23" : "cycling"
+            'L22' : "news",
+            "L23" : "cycling",
+            "L24" : "dance",
+            "L25" : "lecture",
+            "L26" : "cooking",
+            "L27" : "lifelog",
+            "L28" : "lifelog",
+            "L29" : "lifelog",
+            "L30" : "lifelog"
         }
+
     def get_fps(self, video_path):
         cmd = [
             'ffprobe',
@@ -59,7 +68,9 @@ class PreprocessingMetadata:
         
         data['video_id'] = video_id
         data['video_type'] = self.rule.get(video_type, "unknown")
+        
         if "fps" not in data:
+            print('Không tìm thấy trường FPS')
             data['fps'] = self.get_fps(video_path)
 
         with open(json_path, 'w', encoding='utf-8') as f:

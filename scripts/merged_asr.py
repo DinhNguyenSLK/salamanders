@@ -12,8 +12,8 @@ def get_first_word(text):
     m = re.search(r"[A-Za-zÀ-ỹĐđ]+", text)
     return m.group(0) if m else ""
 
-MAX_WORDS = 180
-MAX_SECONDS = 45.0
+MAX_WORDS = 100
+MAX_SECONDS = 45
 
 def merge_segments_greedy(path, viet_dict, hard=False):
     with open(path, newline="", encoding="utf-8") as f:
@@ -102,8 +102,8 @@ if __name__ == "__main__":
         
         viet_dict = set(data)
 
-    ASR_INPUT_DIR = Path("./collection_dir/asr")
-    ASR_OUT_DIR = Path("./collection_dir/merged-asr")
+    ASR_INPUT_DIR = Path("./collection_dir/asr/L30")
+    ASR_OUT_DIR = Path("./collection_dir/semantic-asr")
 
     if not ASR_OUT_DIR.exists():
         ASR_OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -111,6 +111,7 @@ if __name__ == "__main__":
     asr_files = ASR_INPUT_DIR.glob("*-asr.csv")
 
     for file in tqdm(list(asr_files)):
+        
         file_name = file.name
         output_path = ASR_OUT_DIR / file_name
         rows = merge_segments_greedy(file, viet_dict)
