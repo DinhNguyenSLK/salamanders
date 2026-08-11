@@ -19,9 +19,11 @@ class QueryItems(BaseModel):
 
 
 class ParamItems(BaseModel):
-    textual_model: Literal["all", "openclip", "siglip2", "align"] = "all"
+    textual_model: Literal["metaclip", "siglip2", "align"] = "metaclip"
     operator: Literal["or", "and"] = "and"
-
+    range: Literal["lt", "gt", "eq"] = "eq"
+    asr_mode: Literal["text", "vector"] = "text"
+    ocr_mode: Literal["text", "vector"] = "text"
 
 class SearchParams(BaseModel):
     query: list[QueryItems]

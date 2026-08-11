@@ -1333,7 +1333,11 @@ function cell2Text(idx) {
   let ocrEl = $("#ocr" + idx);
   if (ocrEl.length > 0) {
     let ocr = ocrEl.val().trim();
-    if (ocr) queryObj.ocr = ocr.toLowerCase();
+    if (ocr) {
+      queryObj.ocr = ocr.toLowerCase();
+      queryParameters.ocr_mode =
+        $('input[name="ocrMode' + idx + '"]:checked').val() || "text";
+    }
   }
 
   let asrEl = $("#asr" + idx);

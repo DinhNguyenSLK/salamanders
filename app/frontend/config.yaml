@@ -342,10 +342,10 @@ ui:
   # The default text-to-image similarity modes to display in the UI as radio
   # buttons. Modes must match backend ParamItems.textual_model.
   textual-modes:
-    - { name: "CLIP", mode: "openclip" }
-    - { name: "SigLIP", mode: "siglip2" }
-    - { name: "ALIGN", mode: "align" }
-    - { name: "Use all", mode: "all" }
+    - { name: "MetaCLIP2", mode: "metaclip2" }
+    - { name: "SigLIP2", mode: "siglip2" }
+    - { name: "ALIGN (cpu)", mode: "align" }
+    
 
   # Parameters of the object search UI.
   objects:

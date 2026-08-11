@@ -6,7 +6,7 @@ from typing import Annotated
 from config import settings
 from search_engine import TextSearchFactory, APIVectorSearch, _videotype_filter, _objectcount_filter
 from search_engine._utils import _filter, _temporal, _slice, _merge
-
+import time
 
 router = APIRouter(
     prefix="/search",
@@ -39,7 +39,8 @@ async def search(
     params: SearchParams,
     es_client: Annotated[AsyncElasticsearch, Depends(get_es_client)],
 ):
-    
+    # Tính thời gian phản hồi
+    start_time = time.time()
 
     queries = QueryParser(params)
     k = queries.params.k
@@ -101,24 +102,42 @@ async def search(
             results = await template.search(pos_query, k)
             tab_results["object_pos"] = results
 
+        # OCR PART
         if queryObj.get("ocr"):
-            ocr_query = queryObj.parseOcr()
-            template = TextSearchFactory.create("match", es_client, index_name)
-            results = await template.search(ocr_query, k)
-            tab_results["ocr"] = results
 
+            if queryObj.get_mode('ocr_mode') == "text":
+
+                print("OCR MODE: TEXT")
+                ocr_query = queryObj.parseOcr()
+                template = TextSearchFactory.create("match", es_client, index_name)
+                results = await template.search(ocr_query, k)
+                tab_results["ocr"] = results
+
+            else:
+                print('No implement')
+                pass
+
+        # ASR PART
         if queryObj.get("asr"):
-            asr_query = queryObj.parseAsr()
-            template = TextSearchFactory.create("match", es_client, index_name)
-            results = await template.search(asr_query, k)
-            tab_results["asr"] = results
 
+            if queryObj.get_mode('asr_mode') == "text":
+                print("ASR MODE: TEXT")
+                asr_query = queryObj.parseAsr()
+                template = TextSearchFactory.create("match", es_client, index_name)
+                results = await template.search(asr_query, k)
+                tab_results["asr"] = results
+            else:
+                print('No implement')
+                pass
+
+        # TAGS PART
         if queryObj.get("tags"):
             tags_query = queryObj.parseTags()
             template = TextSearchFactory.create("should_term", es_client, index_name)
             results = await template.search(tags_query, k)
             tab_results["tags"] = results
 
+        # FINAL LOGIC
         merged_results = _merge(tab_results)
        
         filtered_results = _filter(merged_results, pre_filter_results)
@@ -129,5 +148,9 @@ async def search(
     temporal_results = _temporal(all_results)
     
     sliced_results = _slice(temporal_results, n_frames_per_round)
+
+    end_time = time.time()
+
+    print(f'Thời gian backend phản hồi {end_time-start_time}')
 
     return sliced_results

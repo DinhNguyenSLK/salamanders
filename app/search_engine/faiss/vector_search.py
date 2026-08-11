@@ -35,7 +35,7 @@ class APIVectorSearch(ABC):
             SearchResult.model_validate(item)
             for item in response.json()
         ]
-        print(f'Vector API results: {results[0].score}')
+        print(f'KAGLLE OK   Vector API results: {results[0].score}')
         return results
 
         
