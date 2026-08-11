@@ -157,7 +157,27 @@ async def _videotype_filter(es_client, index_name, query):
 async def _objectcount_filter(es_client, index_name, query):
     filter_list = []
 
+    print(f'Object count filter with query {query}')
+
+    
+    
     for obj in query["value"]:
+
+        if query['range'] == "eq":
+            count_filter = {
+                    "term" : {
+                        f"{query["field"]}.count" : obj.count
+                    }
+                }
+        else:
+            count_filter = {
+                            "range": {
+                                f"{query['field']}.count": {
+                                    query["range"] : obj.count
+                                                }
+                                }
+                        }
+            
         filter_list.append({
             "nested": {
                 "path": query["field"],
@@ -169,13 +189,8 @@ async def _objectcount_filter(es_client, index_name, query):
                                     f"{query['field']}.label": obj.label
                                 }
                             },
-                            {
-                                "range": {
-                                    f"{query['field']}.count": {
-                                        "lte": obj.count
-                                    }
-                                }
-                            }
+
+                            count_filter
                         ]
                     }
                 }

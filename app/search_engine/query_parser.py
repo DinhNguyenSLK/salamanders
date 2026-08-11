@@ -10,9 +10,13 @@ class QueryObj:
         self.query = query
         self.parameter = parameter
         self.query_dict = query.model_dump()
+        self.parameter_dict = parameter.model_dump()
 
     def get(self, query_type: str):
         return self.query_dict.get(query_type, None)
+    
+    def get_mode(self, mode_name):
+        return self.parameter_dict.get(mode_name, None)
     
     def parseVf(self):
         return {
@@ -58,7 +62,8 @@ class QueryObj:
     def parseObjCount(self):
         return {
             "field": "object_count",
-            "value": self.query.object_count
+            "value": self.query.object_count,
+            "range" : self.parameter.range
         }
 
     

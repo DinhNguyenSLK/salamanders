@@ -25,7 +25,7 @@ def create_faiss(feature_name):
 
 
 if __name__ == "__main__":
-    features_name = ['openclip', 'siglip2', 'align', 'dinov2']
-    create_faiss(features_name[1])
+    features_name = ['metaclip2', 'siglip2', 'align', 'dinov2']
+    create_faiss(features_name[0])
 
     # python -m scripts.index_faiss

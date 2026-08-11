@@ -6,7 +6,7 @@ def _filter(results: list[SearchResult], pre_filter_results: set):
 
     if pre_filter_results is None:
         return results
-    
+    print(f'Len results in filter {len(results)}')
     if len(results) == 0:      # Gỉa định trả về kết quả nếu người dùng chỉ filter
         return [SearchResult(
             score=1, imgId = img_id, videoId=img_id.split('-')[0], selectedFrame=int(img_id.split('-')[1])

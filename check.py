@@ -384,7 +384,7 @@ def check_size():
     import h5py
     import numpy as np
 
-    folder = Path("./collection_dir/features-siglip2")
+    folder = Path("./collection_dir/features-metaclip2")
     total_vector = 0
     size = None
     for file in tqdm(sorted(folder.glob("*/*.hdf5")), desc = "Check size file hdf5"):
@@ -403,6 +403,7 @@ def check_size():
                 return
 
             total_vector += data.shape[0]
+            
     print(f'Tổng số vector {total_vector} với size {size}')
 
 

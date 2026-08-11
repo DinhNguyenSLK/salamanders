@@ -161,9 +161,9 @@ const searchForm = (
 				<button type="button" class="field-panel-toggle" aria-expanded="false" onclick="toggleFieldPanel(this)">Object count</button>
 				<div class="field-panel-body object-count-body">
 					<div class="object-count-range" role="group" aria-label="Object count comparison">
-						<button type="button" class="object-count-range-btn" data-range="lt" aria-pressed="false">lt</button>
+						<button type="button" class="object-count-range-btn active" data-range="lt" aria-pressed="false">lt</button>
 						<button type="button" class="object-count-range-btn" data-range="gt" aria-pressed="false">gt</button>
-						<button type="button" class="object-count-range-btn active" data-range="eq" aria-pressed="true">eq</button>
+						<button type="button" class="object-count-range-btn" data-range="eq" aria-pressed="true">eq</button>
 					</div>
 					<textarea id="not${canvasID}" class="font-normal field-input" rows="2"
 						data-range="eq" placeholder="e.g. 2 person 3 car 0 dog"></textarea>
@@ -173,6 +173,16 @@ const searchForm = (
 			<div class="field-panel collapsed" id="panel_ocr${canvasID}">
 				<button type="button" class="field-panel-toggle" aria-expanded="false" onclick="toggleFieldPanel(this)">OCR</button>
 				<div class="field-panel-body">
+					<div class="mode-row asr-modes">
+						<label class="mode-chip">
+							<input type="radio" name="ocrMode${canvasID}" value="text" checked>
+							<span>Text</span>
+						</label>
+						<label class="mode-chip">
+							<input type="radio" name="ocrMode${canvasID}" value="vector">
+							<span>Vector</span>
+						</label>
+					</div>
 					<textarea id="ocr${canvasID}" class="font-normal field-input" rows="2"
 						placeholder="Text visible in the frame..."></textarea>
 				</div>
@@ -190,10 +200,7 @@ const searchForm = (
 							<input type="radio" name="asrMode${canvasID}" value="vector">
 							<span>Vector</span>
 						</label>
-						<label class="mode-chip">
-							<input type="radio" name="asrMode${canvasID}" value="hybrid">
-							<span>Hybrid</span>
-						</label>
+						
 					</div>
 					<textarea id="asr${canvasID}" class="font-normal field-input" rows="2"
 						placeholder="Spoken / transcribed text..."></textarea>
