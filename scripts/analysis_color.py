@@ -10,6 +10,11 @@ def run():
     video_ids_path =  [p for p in video_dir.iterdir() if p.is_dir()]
 
     for video_path in video_ids_path:
+        video_id = video_path.stem
+
+        if video_id <= 'L23_V016':
+            continue
+    
         print(f'==== Processing {video_path.stem} =========')
         cmd = [
             "python", '-m',
@@ -23,7 +28,7 @@ def run():
 
 if __name__ == "__main__":
     run()
-    # python -m client.analysis_color
+    # python -m scripts.analysis_color
         
 
 

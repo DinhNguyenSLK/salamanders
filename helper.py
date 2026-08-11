@@ -8,8 +8,11 @@ from pathlib import Path
 import tempfile
 import threading
 import itertools
+import numpy as np
+import pandas as pd
+from tqdm import tqdm
 
-from sympy import fps
+# from sympy import fps
 
 def copy_scenes_file():
     src = Path("data/metadata/shot_metadata")
@@ -112,9 +115,42 @@ def object_count(force=False, progress=None):
         writer = csv.writer(f)
         for key in sorted(count.keys()):
             writer.writerow([key, count[key]])  
-               
+
+def extract_fps_from_mapping():
+
+    input_dir = Path('./collection_dir/map_kf_BTC')
+    media_input = Path('./collection_dir/media-info')
+    
+
+    for csv_file in tqdm(sorted(input_dir.glob('*.csv'))):
+        video_id = csv_file.stem
+
+        data = pd.read_csv(csv_file)
+        fps = None
+
+        for row in data.itertuples():
+
+            if fps is None:
+                fps = row.fps
+            else:
+                if fps != row.fps:
+                    print('FPS khasc nhau trong cung video')
+                    return
+                fps = row.fps
+
+        media_file = media_input / f'{video_id}.json'
+
+        with open(media_file, 'r', encoding='latin1') as f:
+            data = json.load(f)
+
+        media_fps = data['fps']
+
+        if media_fps != fps:
+            print(video_id, 'Không khớp fps', f'media: {media_fps} - fps: {fps}')
+            
 if __name__=="__main__":
     # copy_scenes_file()
     # check_cfr_all()
     # create_video_ids_list()
-    object_count()
+    # object_count()
+    extract_fps_from_mapping()

@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 class ElasticIndex:
 
-    def __init__(self, host, index_name, force=False):
+    def __init__(self, host, index_name, force=True):
         self.es = Elasticsearch(hosts=[host])
         self.index_name = index_name
         self.force = force
@@ -61,15 +61,15 @@ def main():
             "title": {"type": "text", "analyzer": "whitespace", "index": False},
             "published_date": {"type": "keyword", "index": False},
 
-            "startframe": {"type": "integer"},
-            "endframe": {"type": "integer"},
-            "middleframe": {"type": "integer"},
+            "startframe": {"type": "integer", "index": False},
+            "endframe": {"type": "integer", "index": False},
+            "middleframe": {"type": "integer", "index": False},
             "selectedframe": {"type": "integer"},
 
             "starttime": {"type": "float", "index": False},
             "endtime": {"type": "float", "index": False},
             "middletime": {"type": "float", "index": False},
-            "selectedtime": {"type": "float", "index": False},
+            "selectedtime": {"type": "float"},
 
             "asr": {"type": "text", "analyzer": "whitespace"},
             "ocr": {"type": "text", "analyzer": "whitespace"},

@@ -24,7 +24,7 @@ class APIVectorSearch(ABC):
         endpoint = self.baseurl + '/' + query_type
         
         query['k'] = k
-        if "textual" in query.keys():
+        if query_type=="textual" and "textual" in query.keys():
             query['textual'] = translate(query['textual'])
 
         print(query)

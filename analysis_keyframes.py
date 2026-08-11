@@ -43,7 +43,7 @@ if __name__ == "__main__":
     # cal_video()
     # python analysis_keyframes.py
     total = 0
-    for file_path in Path("./collection_dir/keyframes-info/L24").glob("*-keyframes.txt"):
+    for file_path in Path("./collection_dir/keyframes-info/L29").glob("*-keyframes.txt"):
         num = count_num_keyframes(file_path)
         total += num
         cal_distance(file_path)

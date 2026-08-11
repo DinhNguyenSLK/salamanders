@@ -176,10 +176,10 @@ class ImageExtractor:
 
 def main():
     parser = argparse.ArgumentParser(description="Extract keyframes from videos")
-    
+
     # Đổi path 2 chỗ này
-    parser.add_argument("--input_dir", type=Path, default=Path("collection_dir/videos/L24"))
-    parser.add_argument("--keyframes_dir", type=Path, default=Path("collection_dir/keyframes-info/L24"))
+    parser.add_argument("--input_dir", type=Path, default=Path("collection_dir/videos/L28"))
+    parser.add_argument("--keyframes_dir", type=Path, default=Path("collection_dir/keyframes-info/L28"))
 
 
     parser.add_argument("--output_dir", type=Path, default=Path("collection_dir/selected-frames"))

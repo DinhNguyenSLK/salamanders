@@ -10,9 +10,12 @@ def check_all_keyframes_increasing():
                 keyframes = line.strip().split()[1:]
                 keyframes = [int(kf) for kf in keyframes]
                 all_keyframes.extend(keyframes)
-        if not all(all_keyframes[i] < all_keyframes[i+1] for i in range(len(all_keyframes)-1)):
-            print(f"{file_path.stem} has non-increasing keyframes.")
-            return False
+        for i in range(len(all_keyframes) - 1):
+            if all_keyframes[i] > all_keyframes[i + 1]:
+                print(f"{file_path.stem} has non-increasing keyframes at index {i}: {all_keyframes[i]} >= {all_keyframes[i + 1]}")
+                return False
+        
+    print("All keyframes in all files are increasing.")
 
 import subprocess
 import json
@@ -289,7 +292,7 @@ def find_shots_max_frames(k):
                 if len(frames) >= k:
                     print(f"{file_path.stem} has shot {shot_id} with {len(frames)} frames. start frame: {frames[0]}, end frame: {frames[-1]}")
 def check_image_exists():
-    keyframes_dir = Path("./collection_dir/keyframes-info/L24")
+    keyframes_dir = Path("./collection_dir/keyframes-info/L22")
     image_dir = Path("./collection_dir/selected-frames")
 
     for keyframe_file in tqdm(list(keyframes_dir.glob("*-keyframes.txt"))):
@@ -312,14 +315,109 @@ def check_image_exists():
                         return
     print("All images exist for the keyframes listed in the text files.") 
 
-                               
+def check_dataset(root_dir='./collection_dir/selected-frames'):
+    import re
+
+    VIDEO_ID_PATTERN = re.compile(r"^L\d{2}_V\d{3}$")
+    IMAGE_PATTERN = re.compile(r"^(L\d{2}_V\d{3})-(\d{5})\.jpg$")
+    root_dir = Path(root_dir)
+
+    total_folders = 0
+    total_images = 0
+    errors = []
+
+    for video_dir in tqdm(sorted(root_dir.iterdir())):
+        if not video_dir.is_dir():
+            continue
+
+        total_folders += 1
+        video_id = video_dir.name
+
+        # Kiểm tra tên folder
+        if not VIDEO_ID_PATTERN.fullmatch(video_id):
+            errors.append(f"[Folder] Invalid folder name: {video_dir}")
+
+        for img_path in sorted(video_dir.iterdir()):
+            if not img_path.is_file():
+                continue
+
+            total_images += 1
+
+            m = IMAGE_PATTERN.fullmatch(img_path.name)
+
+            # Sai format tên file
+            if m is None:
+                errors.append(f"[File] Invalid filename: {img_path}")
+                continue
+
+            file_video_id, frame_id = m.groups()
+
+            # Prefix không khớp tên folder
+            if file_video_id != video_id:
+                errors.append(
+                    f"[Mismatch] Folder={video_id}, File={img_path.name}"
+                )
+    print(f"Checked {total_folders} folders")
+    print(f"Checked {total_images} images")
+    print(f"Found {len(errors)} errors")
+
+    if errors:
+        print("\n===== ERROR LIST =====")
+        for e in errors:
+            print(e)
+
+    return errors
+
+def count_kf_per_video():
+    kf_dir = Path("./collection_dir/selected-frames")
+    c = {}
+    for video_dir in kf_dir.iterdir():
+        if not video_dir.is_dir():
+            continue
+        video_id = video_dir.name
+        num_kf = len(list(video_dir.glob("*.jpg")))
+        c[video_id] = num_kf
+    with open("keyframe_count.json", "w") as f:
+        json.dump(c, f, indent=4)
+
+def check_size():
+    import h5py
+    import numpy as np
+
+    folder = Path("./collection_dir/features-siglip2")
+    total_vector = 0
+    size = None
+    for file in tqdm(sorted(folder.glob("*/*.hdf5")), desc = "Check size file hdf5"):
+
+        if file.stat().st_size/1024 <= 100:
+            print(f'{file.stem} is low size')
+
+        with h5py.File(file, 'r') as f:
+            data = np.array(f['data'])
+
+            if size is None:
+                size = data.shape[1]
+
+            if data.shape[1] != size:
+                print("SIZE VECTOR KHONG KHOP !!!!!!!!!!!!!!!!!!!!!")
+                return
+
+            total_vector += data.shape[0]
+    print(f'Tổng số vector {total_vector} với size {size}')
+
+
 if __name__ == "__main__":
     from tqdm import tqdm
-    check_image_exists()
-
-    # video_dir = sorted(list(Path("./collection_dir/videos").glob("**/*.mp4")))
-    # for video_path in tqdm(video_dir):
-    #     has_video_over_100k_frames(video_path)
-
-    # check_all_keyframes_increasing()
-    # find_shots_max_frames(100)
+    check_size()
+    for file_path in tqdm(sorted(list(Path("./collection_dir/selected-frames").glob("*/*.jpg")))):
+        if len(file_path.stem) != 14:
+            print(f"Invalid filename length: {file_path}")
+       
+    # check_image_exists()
+    check_dataset()
+    video_dir = sorted(list(Path("./collection_dir/videos").glob("**/*.mp4")))
+    for video_path in tqdm(video_dir):
+        has_video_over_100k_frames(video_path)
+    count_kf_per_video()
+    check_all_keyframes_increasing()
+    find_shots_max_frames(100)

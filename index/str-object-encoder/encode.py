@@ -10,7 +10,7 @@ import math
 import operator
 from pathlib import Path
 import subprocess
-
+from tqdm import tqdm
 import pandas as pd
 
 from services.common import load_config
