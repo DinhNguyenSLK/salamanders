@@ -83,7 +83,8 @@ def main():
     }}
     
 
-    elastic_index = ElasticIndex(ES_HOST, INDEX_NAME, force=True)
+    # Keep existing documents when resuming a partially completed index run.
+    elastic_index = ElasticIndex(ES_HOST, INDEX_NAME, force=False)
     elastic_index.create_index(mappings=mappings)
 
     INPUT_DIR = Path("./collection_dir/elastic-documents")

@@ -3,11 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 import uvicorn
 import subprocess
+import sys
 from typing import Annotated
 
 from contextlib import asynccontextmanager
 from search_engine import ElasticSearchClientSingleton
-from routes import search, media, get_field, rewrite, generate_image
+from routes import search, media, get_field, rewrite, generate_image, submission
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -50,7 +51,8 @@ app.include_router(media.router)
 app.include_router(get_field.router)
 app.include_router(rewrite.router)
 app.include_router(generate_image.router)
+app.include_router(submission.router)
 
 
 if __name__ == "__main__":
-    subprocess.run(["uvicorn", "main:app", "--port", "8080", "--reload"])
+    subprocess.run([sys.executable, "-m", "uvicorn", "main:app", "--port", "8080", "--reload"])

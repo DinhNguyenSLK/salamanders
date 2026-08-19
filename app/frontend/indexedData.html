@@ -1,77 +1,204 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
-<html>
-<head>
-<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-<title>VBS Indexed Data</title>
-<link href="css/vbs.css" rel="stylesheet">
-<script src="js/jquery-3.3.1.min.js"></script>
-<script src="js/js-yaml.min.js"></script>
-<script src="js/visione.js"></script>
-</head>
-<body>
-	<div class="container" style="visibility: hidden;">
-	<div style="padding-left: 20px;">
-		<h3 id='imgID' align="center" style="color: navy;"></h3>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <title>Frame Inspector · Salamanders</title>
+    <link rel="icon" href="favicon.ico" />
+    <link rel="stylesheet" href="css/indexedData.css?v=1" />
+    <script src="js/jquery-3.3.1.min.js"></script>
+    <script src="js/js-yaml.min.js"></script>
+    <script src="js/visione.js?v=45"></script>
+  </head>
+  <body>
+    <div id="loadingState" class="loading-state" role="status" aria-live="polite">
+      <span class="loading-spinner" aria-hidden="true"></span>
+      <span>Loading frame information…</span>
+    </div>
 
-		<div >
-			<span id='img'></span>
-		</div>
-	</div>
+    <main id="frameInspector" class="frame-inspector" hidden>
+      <header class="inspector-header">
+        <div class="inspector-heading">
+          <div class="brand-mark" aria-hidden="true">S</div>
+          <div>
+            <p class="eyebrow">Salamanders · Frame inspector</p>
+            <h1 id="frameTitle">Frame information</h1>
+            <div class="identity-pills" aria-label="Frame identity">
+              <span class="identity-pill"><small>Video ID</small><strong id="videoIdLabel"></strong></span>
+              <span class="identity-pill"><small>Frame ID</small><strong id="frameIdLabel"></strong></span>
+            </div>
+          </div>
+        </div>
 
-		<h2 style="color: navy;">Objects Info</h2>
-		<div id='objectsInfo'></div>
+        <nav class="header-actions" aria-label="Frame actions">
+          <button type="button" class="action-button action-button-secondary" id="backButton">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+            Back
+          </button>
+          <a class="action-button action-button-primary" id="allKeyframesLink">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>
+            All keyframes
+          </a>
+        </nav>
+      </header>
 
-		<h2 style="color: navy;">OCR</h2>
-		<div id='ocr'></div>
+      <div class="inspector-layout">
+        <section class="preview-card" aria-labelledby="previewHeading">
+          <div class="card-heading preview-card-heading">
+            <div>
+              <span class="section-kicker">Selected result</span>
+              <h2 id="previewHeading">Keyframe preview</h2>
+            </div>
+            <a id="openImageLink" class="open-original" target="_blank" rel="noopener">
+              Open original
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h5v5M19 5l-8 8" /><path d="M19 14v5H5V5h5" /></svg>
+            </a>
+          </div>
+          <div class="preview-stage">
+            <img id="preview" alt="" decoding="async" />
+          </div>
+          <footer class="preview-footer">
+            <span><span class="status-dot" aria-hidden="true"></span>Indexed keyframe</span>
+            <span id="previewCaption"></span>
+          </footer>
+        </section>
 
-		<h2 style="color: navy;">ASR</h2>
-		<div id='asr'></div>
+        <aside class="metadata-panel" aria-label="Indexed metadata">
+          <section class="metadata-card metadata-card-wide">
+            <div class="metadata-heading">
+              <span class="metadata-icon metadata-icon-objects" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z" /><path d="m4.5 7.8 7.5 4.3 7.5-4.3M12 12.1V21" /></svg>
+              </span>
+              <div><span>Detection</span><h2>Objects</h2></div>
+            </div>
+            <div id="objectsInfo" class="chip-list"></div>
+          </section>
 
-		<h2 style="color: navy;">Tags</h2>
-		<div id='tags'></div>
-	</div>
+          <section class="metadata-card">
+            <div class="metadata-heading">
+              <span class="metadata-icon metadata-icon-ocr" aria-hidden="true">T</span>
+              <div><span>Visible text</span><h2>OCR</h2></div>
+            </div>
+            <p id="ocr" class="metadata-copy"></p>
+          </section>
 
-	<script>
+          <section class="metadata-card">
+            <div class="metadata-heading">
+              <span class="metadata-icon metadata-icon-asr" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M12 4v16M8 8v8M4 10v4M16 7v10M20 10v4" /></svg>
+              </span>
+              <div><span>Spoken text</span><h2>ASR</h2></div>
+            </div>
+            <p id="asr" class="metadata-copy"></p>
+          </section>
 
-	function loadPage() {
-	$.urlParam = function(name) {
-		var results = new RegExp('[\?&]' + name + '=([^&#]*)')
-				.exec(window.location.href);
-		return results[1] || 0;
-	}
+          <section class="metadata-card metadata-card-wide">
+            <div class="metadata-heading">
+              <span class="metadata-icon metadata-icon-tags" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M20 13 13 20l-9-9V4h7l9 9Z" /><circle cx="8.5" cy="8.5" r="1.2" /></svg>
+              </span>
+              <div><span>Semantic labels</span><h2>Tags</h2></div>
+            </div>
+            <div id="tags" class="chip-list chip-list-tags"></div>
+          </section>
+        </aside>
+      </div>
+    </main>
 
+    <section id="errorState" class="error-state" hidden role="alert">
+      <div class="error-mark" aria-hidden="true">!</div>
+      <h1>Unable to load frame</h1>
+      <p id="errorMessage">The requested frame information is unavailable.</p>
+      <a href="index.html" class="action-button action-button-primary">Return to search</a>
+    </section>
 
-	imgId = $.urlParam('id');
-	videoId = $.urlParam('videoId');
+    <script>
+      function setCopy(elementId, value) {
+        var element = document.getElementById(elementId);
+        var normalized = String(value || "").trim();
+        element.textContent = normalized || "No indexed data";
+        element.classList.toggle("is-empty", !normalized);
+      }
 
-	frameName = imgId
+      function setChips(elementId, value) {
+        var element = document.getElementById(elementId);
+        var tokens = String(value || "").trim().split(/\s+/).filter(Boolean);
+        element.replaceChildren();
 
-	imgIdTokens = imgId.split("/");
-	if (imgIdTokens.length > 1)
-		frameName = imgIdTokens[1];
-	path = videoId + "/"+ frameName;
+        if (!tokens.length) {
+          var empty = document.createElement("span");
+          empty.className = "empty-value";
+          empty.textContent = "No indexed data";
+          element.appendChild(empty);
+          return;
+        }
 
+        tokens.forEach(function (token) {
+          var chip = document.createElement("span");
+          chip.className = "data-chip";
+          chip.textContent = token.replaceAll("_", " ");
+          chip.title = token;
+          element.appendChild(chip);
+        });
+      }
 
+      function showError(message) {
+        document.getElementById("loadingState").hidden = true;
+        document.getElementById("frameInspector").hidden = true;
+        document.getElementById("errorMessage").textContent = message;
+        document.getElementById("errorState").hidden = false;
+      }
 
-	img = '<img id="preview" width=1024 src="'+keyFramesUrl+ videoId + "/" + frameName + '.jpg">'
-	console.log('====ID' + imgId);
+      function loadPage() {
+        var params = new URLSearchParams(window.location.search);
+        var imgId = params.get("id") || "";
+        var videoId = params.get("videoId") || "";
+        if (!imgId || !videoId) {
+          showError("Missing video ID or frame ID in the URL.");
+          return;
+        }
 
-	objectsInfo = getText(imgId, 'objectsinfo');
-	ocr = getText(imgId, 'ocr');
-	asr = getText(imgId, 'asr');
-	tags = getText(imgId, 'tags');
+        var imgIdTokens = imgId.split("/");
+        var frameName = imgIdTokens.length > 1 ? imgIdTokens[1] : imgId;
+        var imageUrl = keyFramesUrl + videoId + "/" + frameName + ".jpg";
+        var allKeyframesUrl =
+          "showVideoKeyframes.html?videoId=" + encodeURIComponent(videoId) +
+          "&id=" + encodeURIComponent(imgId) + "#" + encodeURIComponent(imgId);
 
-	$('.container').css('visibility', 'visible');
-		$('#imgID').append('<a title="Show All Video Keyframes"  href="showVideoKeyframes.html?videoId='+ videoId + '&id=' + imgId + '#' + imgId + '"> Keyframes of ' + videoId + '</a>');
-		$('#img').append(img);
-		$('#objectsInfo').append(objectsInfo || '(empty)');
-		$('#ocr').append(ocr || '(empty)');
-		$('#asr').append(asr || '(empty)');
-		$('#tags').append(tags || '(empty)');
-	}
+        document.title = frameName + " · Frame Inspector";
+        document.getElementById("frameTitle").textContent = frameName;
+        document.getElementById("videoIdLabel").textContent = videoId;
+        document.getElementById("frameIdLabel").textContent = frameName;
+        document.getElementById("previewCaption").textContent = videoId + " / " + frameName;
+        document.getElementById("allKeyframesLink").href = allKeyframesUrl;
+        document.getElementById("openImageLink").href = imageUrl;
 
-	loadConfig().then(loadPage);
-	</script>
+        var preview = document.getElementById("preview");
+        preview.src = imageUrl;
+        preview.alt = "Keyframe " + frameName + " from video " + videoId;
+        preview.addEventListener("error", function () {
+          preview.classList.add("is-missing");
+          preview.alt = "Keyframe image unavailable";
+        }, { once: true });
 
-</body>
+        setChips("objectsInfo", getText(imgId, "objectsinfo"));
+        setCopy("ocr", getText(imgId, "ocr"));
+        setCopy("asr", getText(imgId, "asr"));
+        setChips("tags", getText(imgId, "tags"));
+
+        document.getElementById("backButton").addEventListener("click", function () {
+          if (window.history.length > 1) window.history.back();
+          else window.location.href = "index.html";
+        });
+
+        document.getElementById("loadingState").hidden = true;
+        document.getElementById("frameInspector").hidden = false;
+      }
+
+      loadConfig().then(loadPage).catch(function () {
+        showError("Configuration could not be loaded. Please return to search and try again.");
+      });
+    </script>
+  </body>
 </html>

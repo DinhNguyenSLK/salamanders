@@ -2,12 +2,16 @@
 <html>
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Video Player</title>
   <link href="https://vjs.zencdn.net/7.18.1/video-js.css" rel="stylesheet" />
   <script src="https://vjs.zencdn.net/7.18.1/video.min.js"></script>
   <script src="js/jquery-3.3.1.min.js"></script>
   <script src="js/js-yaml.min.js"></script>
-  <script src="js/visione.js"></script>
+  <script src="js/visione.js?v=45"></script>
+  <script src="js/videoYoutubeUrls.js?v=1"></script>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -55,6 +59,119 @@
       font-size: 12px;
     }
     #actions { margin-top: 10px; }
+    #youtubeFallback {
+      display: none;
+      width: 640px;
+      height: 480px;
+      background: #000;
+    }
+    #youtubePlayButton[hidden] { display: none; }
+    #youtubePlayButton {
+      align-items: center;
+      background: rgba(199, 35, 35, 0.96);
+      border: 0;
+      border-radius: 14px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+      color: #fff;
+      cursor: pointer;
+      display: inline-flex;
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      gap: 9px;
+      left: 50%;
+      min-height: 52px;
+      padding: 0 20px;
+      position: absolute;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      transition: background-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+      z-index: 20;
+    }
+    #youtubePlayButton:hover,
+    #youtubePlayButton:focus-visible {
+      background: #e12a2a;
+      box-shadow: 0 12px 34px rgba(0, 0, 0, 0.55);
+      outline: 3px solid rgba(255, 255, 255, 0.34);
+      transform: translate(-50%, -50%) scale(1.04);
+    }
+    #youtubePlayButton:disabled {
+      cursor: wait;
+      opacity: 0.72;
+    }
+    #youtubePlayButton svg {
+      fill: currentColor;
+      height: 22px;
+      width: 22px;
+    }
+    #fallbackNotice {
+      display: none;
+      margin-top: 8px;
+      color: #ffd166;
+      font-size: 12px;
+    }
+    .submit-settings-modal {
+      align-items: center;
+      background: rgba(0, 0, 0, 0.35);
+      display: flex;
+      inset: 0;
+      justify-content: center;
+      padding: 20px;
+      position: fixed;
+      z-index: 200;
+    }
+    .submit-settings-modal[hidden] { display: none; }
+    .submit-settings-card {
+      background: #fff;
+      border: 1px solid #bbb;
+      border-radius: 6px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+      color: #222;
+      padding: 12px;
+      width: min(440px, calc(100vw - 40px));
+    }
+    .submit-settings-header {
+      align-items: center;
+      display: flex;
+      font-weight: 700;
+      justify-content: space-between;
+      margin-bottom: 9px;
+    }
+    .submit-settings-close {
+      background: transparent;
+      border: 0;
+      color: #777;
+      cursor: pointer;
+      font-size: 20px;
+    }
+    .qa-answer-context { color: #666; font-size: 12px; margin-bottom: 8px; }
+    .qa-answer-card label { color: #555; display: block; font-weight: 600; }
+    .qa-answer-card textarea {
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+      display: block;
+      font-family: inherit;
+      margin-top: 3px;
+      padding: 6px;
+      resize: vertical;
+      width: 100%;
+    }
+    .submit-settings-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 11px; }
+    .submit-settings-actions button { border: 1px solid #bbb; border-radius: 4px; cursor: pointer; padding: 5px 9px; }
+    .submit-settings-save { background: #198754; border-color: #198754 !important; color: #fff; }
+    .kis-server-response-body {
+      background: #f7f7f7;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      color: #222;
+      max-height: 300px;
+      min-height: 55px;
+      overflow: auto;
+      padding: 9px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
     #submit {
       padding: 8px 14px;
       cursor: pointer;
@@ -70,12 +187,6 @@
 
 <body>
   <script type="text/javascript">
-    function checkQA() {
-      let isQA = localStorage.getItem('taskType') === 'qa' ? true : false;
-      if (isQA) submitQA();
-      return isQA;
-    }
-
     $.urlParam = function(name) {
       var results = new RegExp('[\\?&]' + name + '=([^&#]*)')
         .exec(window.location.href);
@@ -83,14 +194,21 @@
     }
 
     function submitAtCurrentPlayTime() {
-      myPlayer.pause();
-      var whereYouAt = myPlayer.currentTime();
-      videoid = $.urlParam('videoid');
-      if (submitAlert()) {
-        res = submitAtTime(videoid, whereYouAt);
-        console.log(res);
-        alert('Server response: ' + res);
+      if (youtubeFallbackActive) {
+        if (youtubePlayer && youtubePlayer.pauseVideo) youtubePlayer.pauseVideo();
+      } else {
+        myPlayer.pause();
       }
+      var whereYouAt = youtubeFallbackActive
+        ? (youtubePlayer && youtubePlayer.getCurrentTime ? youtubePlayer.getCurrentTime() : currentSeekTime)
+        : myPlayer.currentTime();
+      videoid = $.urlParam('videoid');
+      var currentFrame = ffmpegFrameIndex(whereYouAt, videoFps);
+      var currentFrameId = videoid + '-' + padFrame(currentFrame);
+      showKISServerResponse('Submitting result', 'Waiting for the submission service response...', false);
+      submitExternalResult({ imgId: currentFrameId, videoId: videoid })
+        .then(function (response) { showKISServerResponse('Submission successful', response, false); })
+        .catch(function (error) { showKISServerResponse('Submission failed', error.message, true); });
     }
   </script>
 
@@ -104,6 +222,11 @@
       height="480"
       playsinline
     ></video>
+    <div id="youtubeFallback"></div>
+    <button type="button" id="youtubePlayButton" aria-label="Play YouTube video" hidden disabled>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>
+      <span>Play video</span>
+    </button>
   </div>
 
   <div id="frameHud">
@@ -121,9 +244,10 @@
   </div>
 
   <div id="actions">
+    <div id="fallbackNotice">Local video unavailable. YouTube fallback is positioned by timestamp; frame-level accuracy is approximate.</div>
     <button id="submit"
       title="Submit result at current play time"
-      onclick="if (!checkQA()) submitAtCurrentPlayTime();">
+      onclick="submitAtCurrentPlayTime();">
       Submit
     </button>
   </div>
@@ -132,6 +256,10 @@
   var myPlayer;
   var videoFps = 25;
   var hudRaf = null;
+  var youtubePlayer = null;
+  var youtubeFallbackActive = false;
+  var currentSeekTime = 0;
+  var youtubeApiPromise = null;
 
   function padFrame(n) {
     var s = String(Math.max(0, n | 0));
@@ -159,9 +287,13 @@
   }
 
   function updateHud() {
-    if (!myPlayer) return;
-    var t = myPlayer.currentTime() || 0;
-    var d = myPlayer.duration();
+    if (!myPlayer && !youtubePlayer) return;
+    var t = youtubeFallbackActive
+      ? (youtubePlayer && youtubePlayer.getCurrentTime ? youtubePlayer.getCurrentTime() : currentSeekTime)
+      : (myPlayer.currentTime() || 0);
+    var d = youtubeFallbackActive
+      ? (youtubePlayer && youtubePlayer.getDuration ? youtubePlayer.getDuration() : NaN)
+      : myPlayer.duration();
     var frame = ffmpegFrameIndex(t, videoFps);
     document.getElementById("frameIndex").textContent = padFrame(frame);
     document.getElementById("timeValue").textContent =
@@ -183,12 +315,14 @@
   }
 
   function seekByFrames(deltaFrames) {
-    if (!myPlayer) return;
-    myPlayer.pause();
-    var t = myPlayer.currentTime() || 0;
+    if (!myPlayer && !youtubePlayer) return;
+    if (!youtubeFallbackActive) myPlayer.pause();
+    var t = youtubeFallbackActive
+      ? (youtubePlayer.getCurrentTime() || currentSeekTime)
+      : (myPlayer.currentTime() || 0);
     var frame = ffmpegFrameIndex(t, videoFps) + deltaFrames;
     if (frame < 0) frame = 0;
-    var duration = myPlayer.duration();
+    var duration = youtubeFallbackActive ? youtubePlayer.getDuration() : myPlayer.duration();
     var newTime = timeFromFrame(frame, videoFps);
     if (isFinite(duration) && duration > 0) {
       var maxFrame = ffmpegFrameIndex(duration, videoFps);
@@ -198,7 +332,9 @@
       }
       if (newTime > duration) newTime = Math.max(0, duration - 0.001);
     }
-    myPlayer.currentTime(newTime);
+    currentSeekTime = newTime;
+    if (youtubeFallbackActive) youtubePlayer.seekTo(newTime, true);
+    else myPlayer.currentTime(newTime);
     updateHud();
   }
 
@@ -208,6 +344,95 @@
     var delta = e.deltaY < 0 ? 1 : e.deltaY > 0 ? -1 : 0;
     if (delta === 0) return;
     seekByFrames(delta);
+  }
+
+  function getYoutubeVideoId(url) {
+    var match = String(url || "").match(/[?&]v=([^&#]+)/) || String(url || "").match(/youtu\.be\/([^?&#]+)/);
+    return match ? match[1] : "";
+  }
+
+  function loadYoutubeApi() {
+    if (window.YT && window.YT.Player) return Promise.resolve();
+    if (youtubeApiPromise) return youtubeApiPromise;
+    youtubeApiPromise = new Promise(function (resolve, reject) {
+      var previousReady = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = function () {
+        if (typeof previousReady === "function") previousReady();
+        resolve();
+      };
+      var script = document.createElement("script");
+      script.src = "https://www.youtube.com/iframe_api";
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
+    return youtubeApiPromise;
+  }
+
+  function updateYoutubePlayButton(playerState) {
+    var button = document.getElementById("youtubePlayButton");
+    if (!button) return;
+    var isActive = window.YT && (
+      playerState === YT.PlayerState.PLAYING ||
+      playerState === YT.PlayerState.BUFFERING
+    );
+    button.hidden = !youtubeFallbackActive || isActive;
+    button.disabled = !youtubePlayer || !youtubePlayer.playVideo;
+  }
+
+  function playYoutubeFallback() {
+    if (!youtubePlayer || !youtubePlayer.playVideo) return;
+    youtubePlayer.unMute();
+    youtubePlayer.playVideo();
+  }
+
+  function switchToYoutube(videoId, seekTime) {
+    var youtubeUrl = (window.videoYoutubeUrls || {})[videoId];
+    var youtubeId = getYoutubeVideoId(youtubeUrl);
+    if (!youtubeId) {
+      document.getElementById("fallbackNotice").textContent = "Local video unavailable and no YouTube URL was found for this video.";
+      document.getElementById("fallbackNotice").style.display = "block";
+      return;
+    }
+    youtubeFallbackActive = true;
+    currentSeekTime = seekTime;
+    myPlayer.pause();
+    myPlayer.el().style.display = "none";
+    document.getElementById("youtubeFallback").style.display = "block";
+    document.getElementById("fallbackNotice").style.display = "block";
+    var youtubePlayButton = document.getElementById("youtubePlayButton");
+    youtubePlayButton.hidden = false;
+    youtubePlayButton.disabled = true;
+    loadYoutubeApi().then(function () {
+      youtubePlayer = new YT.Player("youtubeFallback", {
+        videoId: youtubeId,
+        playerVars: {
+          autoplay: 0,
+          controls: 1,
+          disablekb: 0,
+          fs: 1,
+          playsinline: 1,
+          rel: 0,
+          start: Math.max(0, Math.floor(seekTime)),
+        },
+        events: {
+          onReady: function (event) {
+            event.target.unMute();
+            event.target.seekTo(seekTime, true);
+            event.target.pauseVideo();
+            updateYoutubePlayButton(YT.PlayerState.PAUSED);
+            updateHud();
+          },
+          onStateChange: function (event) {
+            updateYoutubePlayButton(event.data);
+            updateHud();
+          },
+        },
+      });
+      startHudLoop();
+    }).catch(function () {
+      youtubePlayButton.hidden = true;
+      document.getElementById("fallbackNotice").textContent = "Unable to load the YouTube fallback player.";
+    });
   }
 
   function loadPage() {
@@ -240,7 +465,7 @@
       controls: true,
       preload: "auto",
       autoplay: false,
-      muted: true,
+      muted: false,
       fluid: false,
       controlBar: {
         children: [
@@ -257,19 +482,18 @@
 
     myPlayer.src({ type: "video/mp4", src: url });
 
+    myPlayer.one("error", function () {
+      switchToYoutube(videoId, seekTime);
+    });
+
     function startAtSeek() {
       var duration = myPlayer.duration();
       if (isFinite(duration) && duration > 0 && seekTime > duration) {
         seekTime = Math.max(0, duration - 0.001);
       }
       myPlayer.currentTime(seekTime);
+      myPlayer.pause();
       updateHud();
-      var playPromise = myPlayer.play();
-      if (playPromise && typeof playPromise.catch === "function") {
-        playPromise.catch(function () {
-          // Autoplay bị chặn — giữ trạng thái pause, nút play vẫn dùng được
-        });
-      }
     }
 
     myPlayer.one("loadedmetadata", function () {
@@ -299,6 +523,7 @@
     myPlayer.on("durationchange", updateHud);
     myPlayer.on("play", updateHud);
     myPlayer.on("pause", updateHud);
+    document.getElementById("youtubePlayButton").addEventListener("click", playYoutubeFallback);
   }
 
   loadConfig().then(loadPage);

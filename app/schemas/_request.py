@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, HttpUrl, Base64Bytes, model_validator
+from pydantic import AnyHttpUrl, Base64Bytes, BaseModel, Field, HttpUrl, model_validator
 from typing import Literal, Self
 
 
@@ -41,6 +41,15 @@ class SearchParams(BaseModel):
         if len(self.query) == 0:
             raise ValueError("query không được rỗng")
         return self
+
+
+class ExternalSubmission(BaseModel):
+    file_name: str = Field(min_length=1, max_length=255)
+    video_id: str = Field(min_length=1, max_length=255)
+    img_id: int = Field(ge=0)
+    submitter: Literal["external"] = "external"
+    image_url: AnyHttpUrl | None = None
+    image_base64: str | None = None
 
 
 class ImageGeneration(BaseModel):

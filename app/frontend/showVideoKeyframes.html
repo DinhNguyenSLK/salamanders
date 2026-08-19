@@ -3,11 +3,14 @@
 
 <head>
 	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+	<meta http-equiv="Pragma" content="no-cache">
+	<meta http-equiv="Expires" content="0">
 	<title>Video Keyframes</title>
 	<link rel="stylesheet" href="css/jquery-ui.min.css">
-	<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.5.0/css/all.css">
+	<link rel="stylesheet" href="css/fontawesome.min.css">
 	<link rel="stylesheet" href="css/bootstrap.css">
-	<link rel="stylesheet" href="css/visione.css">
+	<link rel="stylesheet" href="css/visione.css?v=24">
 	<style>
 		/* Override main UI lock — this page needs normal document scroll */
 		html.page-keyframes,
@@ -15,29 +18,289 @@
 			overflow: auto !important;
 			height: auto !important;
 			min-height: 100%;
+			background:
+				radial-gradient(circle at top left, rgba(202, 145, 62, 0.16), transparent 34rem),
+				#f6f1e9;
+			color: #443326;
+			font-family: Inter, "Segoe UI", Arial, sans-serif;
+			padding: 0 12px 32px;
 		}
 		body.page-keyframes #keyframes {
-			padding-bottom: 24px;
+			padding: max(28px, calc(50vh - 120px)) 0;
 		}
 		body.page-keyframes #keyframes .row {
 			display: flex;
 			flex-wrap: wrap;
+			gap: 10px;
 			justify-content: center;
+			margin: 0;
+			padding: 5px 0;
+		}
+		body.page-keyframes > table {
+			width: 100%;
+		}
+		.keyframes-header {
+			align-items: center;
+			background: rgba(255, 253, 249, 0.92);
+			border: 1px solid #e2cba9;
+			border-radius: 14px;
+			box-shadow: 0 8px 24px rgba(91, 61, 31, 0.1);
+			display: flex;
+			flex-wrap: wrap;
+			gap: 7px;
+			justify-content: center;
+			margin: 14px auto 8px;
+			max-width: max-content;
+			padding: 9px 14px;
+		}
+		.keyframes-header-label {
+			color: #8d5e2d;
+			font-size: 11px;
+			font-weight: 800;
+			letter-spacing: 0.08em;
+			text-transform: uppercase;
+		}
+		.keyframes-header-link {
+			background: #f7ead6;
+			border-radius: 999px;
+			color: #713f18;
+			font-size: 13px;
+			font-weight: 700;
+			padding: 4px 9px;
+			text-decoration: none;
+		}
+		.keyframes-header-link:hover,
+		.keyframes-header-link:focus-visible {
+			background: #ecd2ab;
+			color: #4e2b12;
+			outline: none;
+			text-decoration: none;
+		}
+		#keyframes .result-border {
+			background: rgba(255, 253, 249, 0.96);
+			border: 1px solid #dec7a5 !important;
+			border-radius: 12px;
+			box-shadow: 0 4px 12px rgba(76, 52, 29, 0.1);
+			margin: 0 !important;
+			padding: 5px !important;
+			transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+		}
+		#keyframes .result-border:not(.selected-keyframe-card) {
+			content-visibility: auto;
+			contain-intrinsic-size: 250px 162px;
+		}
+		#keyframes .result-border:hover {
+			border-color: #b8894d !important;
+			box-shadow: 0 8px 20px rgba(76, 52, 29, 0.16);
+			transform: translateY(-2px);
+		}
+		#keyframes .selected-keyframe-card {
+			background: #fffafa;
+			border: 3px solid #dc2626 !important;
+			box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.32), 0 0 24px 8px rgba(220, 38, 38, 0.46), 0 12px 28px rgba(127, 29, 29, 0.34);
+			position: relative;
+		}
+		#keyframes .selected-keyframe-card:hover {
+			border-color: #b91c1c !important;
+			box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.38), 0 0 30px 10px rgba(220, 38, 38, 0.56), 0 14px 32px rgba(127, 29, 29, 0.4);
+		}
+		#keyframes .selected-keyframe-card::before {
+			background: #dc2626;
+			border-radius: 0 0 0 6px;
+			color: #fff;
+			content: "Selected";
+			font-size: 11px;
+			font-weight: 700;
+			padding: 3px 7px;
+			position: absolute;
+			right: 0;
+			top: 0;
+			z-index: 1;
+		}
+		#keyframes .selected-keyframe-card .videoSummarySelected {
+			border: 0;
+			box-shadow: none;
+		}
+		.keyframe-image-wrapper {
+			display: block;
+			line-height: 0;
+			position: relative;
+		}
+		.keyframe-image-wrapper img {
+			border-radius: 8px;
+			display: block;
+			max-width: 100%;
+			object-fit: cover;
+		}
+		.keyframe-toolbar {
+			align-items: center;
+			display: flex;
+			gap: 5px;
+			min-height: 31px;
+			padding: 5px 1px 0;
+		}
+		.keyframe-frame-id {
+			color: #73502e;
+			flex: 1 1 auto;
+			font-size: 11px;
+			font-weight: 700;
+			max-width: 130px;
+			overflow: hidden;
+			text-decoration: none;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+		.keyframe-frame-id:hover,
+		.keyframe-frame-id:focus-visible {
+			color: #4d2c12;
+			outline: none;
+			text-decoration: underline;
+		}
+		.keyframe-action {
+			align-items: center;
+			background: #fff;
+			border: 1px solid #d9c7b0;
+			border-radius: 50%;
+			box-shadow: 0 1px 3px rgba(69, 47, 28, 0.12);
+			cursor: pointer;
+			display: inline-flex;
+			flex: 0 0 27px;
+			font-size: 12px;
+			height: 27px;
+			justify-content: center;
+			padding: 0;
+			transition: background-color 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease, transform 0.14s ease;
+			width: 27px;
+		}
+		.keyframe-action:hover,
+		.keyframe-action:focus-visible {
+			box-shadow: 0 3px 7px rgba(69, 47, 28, 0.2);
+			outline: none;
+			transform: translateY(-1px);
+		}
+		.keyframe-action-video {
+			color: #2563a9;
+		}
+		.keyframe-action-video:hover,
+		.keyframe-action-video:focus-visible {
+			background: #eaf3ff;
+			border-color: #79a9dc;
+		}
+		.keyframe-action-similarity {
+			color: #815a2e;
+		}
+		.keyframe-action-similarity:hover,
+		.keyframe-action-similarity:focus-visible {
+			background: #f8ecd8;
+			border-color: #c59961;
+		}
+		.keyframe-action-submit {
+			color: #18843b;
+		}
+		.keyframe-action-submit:hover,
+		.keyframe-action-submit:focus-visible {
+			background: #eaf7ed;
+			border-color: #55ad6d;
+		}
+		.keyframe-image-wrapper::after {
+			background: #212529;
+			border-radius: 4px;
+			bottom: calc(100% + 8px);
+			color: #fff;
+			content: attr(data-tooltip);
+			font-size: 12px;
+			left: 50%;
+			opacity: 0;
+			padding: 5px 8px;
+			pointer-events: none;
+			position: absolute;
+			transform: translateX(-50%) translateY(4px);
+			transition: opacity 0.15s ease, transform 0.15s ease;
+			white-space: nowrap;
+			z-index: 2;
+		}
+		.keyframe-image-wrapper:hover::after,
+		.keyframe-image-wrapper:focus-within::after {
+			opacity: 1;
+			transform: translateX(-50%) translateY(0);
+		}
+		.return-to-selected-frame {
+			background: #e53935;
+			border: 0;
+			border-radius: 22px;
+			bottom: 20px;
+			box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+			color: #fff;
+			cursor: pointer;
+			font-size: 14px;
+			font-weight: 600;
+			padding: 10px 16px;
+			position: fixed;
+			right: 20px;
+			text-decoration: none;
+			z-index: 1000;
+		}
+		.return-to-selected-frame:hover {
+			background: #c62828;
+			color: #fff;
+			text-decoration: none;
+		}
+		.return-to-selected-frame[hidden] {
+			display: none;
+		}
+		.keyframe-preview-trigger {
+			cursor: zoom-in;
+		}
+		.keyframe-image-modal {
+			align-items: center;
+			background: rgba(0, 0, 0, 0.78);
+			display: flex;
+			inset: 0;
+			justify-content: center;
+			padding: 24px;
+			position: fixed;
+			z-index: 1050;
+		}
+		.keyframe-image-modal[hidden] {
+			display: none;
+		}
+		.keyframe-image-modal-content {
+			max-height: calc(100vh - 48px);
+			max-width: min(1200px, 92vw);
+			object-fit: contain;
+		}
+		.keyframe-image-modal-close {
+			background: #fff;
+			border: 0;
+			border-radius: 50%;
+			color: #222;
+			cursor: pointer;
+			font-size: 28px;
+			height: 42px;
+			line-height: 38px;
+			position: fixed;
+			right: 24px;
+			top: 18px;
+			width: 42px;
+			z-index: 1;
+		}
+		.keyframe-image-modal-close:hover {
+			background: #e9e9e9;
 		}
 	</style>
 	<script src="js/jquery-3.3.1.min.js"></script>
 	<script src="js/jquery-ui.min.js"></script>
 	<script src="js/js-yaml.min.js"></script>
-	<script src="js/visione.js"></script>
+	<script src="js/visione.js?v=45"></script>
 </head>
 
 <body class="page-keyframes">
-	<div align="center" style="font-size: x-large; padding: 15px;">
-		<span style="color: navy;">Video</span>
-		<span><a id="videoURL" style="color: red;" title='Play video' href=""></a></span>
-		<span style="color: navy;">- Keyframe</span>
-		<span><a id="imgId" style="color: red;" title="go to keyframe" href=""></a></span>
-	</div>
+	<header class="keyframes-header">
+		<span class="keyframes-header-label">Video</span>
+		<a id="videoURL" class="keyframes-header-link" title="Play video" href=""></a>
+		<span class="keyframes-header-label">Keyframe</span>
+		<a id="imgId" class="keyframes-header-link" title="Go to keyframe" href=""></a>
+	</header>
 	<table align="center">
 		<tr>
 			<td>
@@ -45,27 +308,41 @@
 			</td>
 		</tr>
 	</table>
+	<div id="keyframeImageModal" class="keyframe-image-modal" hidden role="dialog" aria-modal="true" aria-label="Keyframe preview">
+		<button type="button" class="keyframe-image-modal-close" aria-label="Close image preview">&times;</button>
+		<img class="keyframe-image-modal-content" alt="">
+	</div>
+	<a id="returnToSelectedFrame" class="return-to-selected-frame" href="#" hidden title="Return to selected frame">↩ Selected frame</a>
 
 	<script>
 
-		function checkQA() {
-			let isQA = localStorage.getItem('taskType') === 'qa' ? true : false;
-
-			if (isQA)
-				submitQA();
-			return isQA;
+		function submit(imgId, videoId) {
+			showKISServerResponse('Submitting result', 'Waiting for the submission service response...', false);
+			submitExternalResult({ imgId: imgId, videoId: videoId }).then(function (response) {
+				showKISServerResponse('Submission successful', response, false);
+			}).catch(function (error) {
+				console.error('KIS submission failed:', error);
+				showKISServerResponse('Submission failed', error.message, true);
+			});
 		}
 
-		function submit(imgId, videoId) {
-			if (!checkQA())
-				if (submitAlert()) {
-					if (localStorage.getItem('taskType') === 'avs')
-						submitResult(imgId, videoId, isAsync=true);
-					else {
-						res = submitResult(imgId, videoId);
-						alert('Server response: ' + res);
-					}
-				}
+		function runVisualSimilarity(frameId) {
+			var queryObj = { vf: frameId };
+			var searchWindow = window;
+			try {
+				if (window.opener && !window.opener.closed && typeof window.opener.searchByLink === 'function')
+					searchWindow = window.opener;
+			} catch (error) {
+				console.warn('Unable to access the search window:', error);
+			}
+
+			if (typeof searchWindow.searchByLink !== 'function') {
+				console.error('Visual similarity search is unavailable.');
+				return;
+			}
+
+			searchWindow.searchByLink(queryObj);
+			if (searchWindow !== window) searchWindow.focus();
 		}
 
 
@@ -87,67 +364,164 @@
 			}
 
 		var imgId = $.urlParam('id');
+		var pageUrlWithoutHash = window.location.pathname + window.location.search;
+		if (window.location.hash)
+			window.history.replaceState(null, "", pageUrlWithoutHash);
 
+		function normalizeKeyframeId(frameId) {
+			return String(frameId || '').replace(/\.(?:jpe?g|png|webp)$/i, '');
+		}
+
+		function focusSelectedFrame() {
+			var selectedFrame = document.querySelector("#keyframes .videoSummarySelected");
+			if (!selectedFrame) return;
+			var selectedCard = selectedFrame.closest(".selected-keyframe-card") || selectedFrame;
+			var cardRect = selectedCard.getBoundingClientRect();
+			var centeredTop = window.scrollY + cardRect.top - (window.innerHeight - cardRect.height) / 2;
+			window.scrollTo({ top: Math.max(0, centeredTop), behavior: "auto" });
+			window.history.replaceState(
+				null,
+				"",
+				pageUrlWithoutHash + "#" + encodeURIComponent(normalizeKeyframeId(imgId)),
+			);
+		}
 
 		function loadPage() {
-
-			id4Regex = this.imgId.replaceAll("/", "\\/").replaceAll(".", "\\.")
-
-			videoId = $.urlParam('videoId');
+			var videoId = $.urlParam('videoId');
+			var videoUrl = videoUrlPrefix + videoId + ".mp4";
 
 			console.log('====ID' + imgId);
-			toLog = '{"query":[{"videosummary":"' + videoId + '"}], "parameters":[{}]}'
-			log(toLog)
-			res = getAllVideoKeyframes(videoId);
-			var keyframes = JSON.parse(res);
+			var toLog = '{"query":[{"videosummary":"' + videoId + '"}], "parameters":[{}]}';
+			log(toLog);
+			$("#videoURL").attr("href", videoUrl);
+			$("#videoURL").text(videoId);
+			$("#imgId").attr("href", "#" + imgId);
+			$("#imgId").text(imgId);
+			$("#returnToSelectedFrame").attr("href", "#" + imgId).prop("hidden", !imgId);
 
-			videoUrl = videoUrlPrefix + videoId + ".mp4"
-			$("#videoURL").attr("href", videoUrl)
-			$("#videoURL").text(videoId)
-			$("#imgId").attr("href", "#" + imgId)
-			$("#imgId").text(imgId)
-			table = ""
-			for (i = 0; i < keyframes.length; i++) {
-				frameName = keyframes[i]
-				path = videoId + "/" + frameName;
+			var keyframesRequest = $.ajax({
+				type: "GET",
+				url: urlVBSService + "/getAllVideoKeyframes?videoId=" + encodeURIComponent(videoId),
+			});
+			var fpsRequest = $.ajax({
+				type: "GET",
+				url: urlVBSService + "/getFps?videoId=" + encodeURIComponent(videoId),
+			});
+
+			return Promise.all([
+				Promise.resolve(keyframesRequest),
+				Promise.resolve(fpsRequest).catch(function () { return 0; }),
+			]).then(function (responses) {
+				var keyframes = responses[0];
+				if (typeof keyframes === "string") keyframes = JSON.parse(keyframes);
+				if (!Array.isArray(keyframes)) keyframes = [];
+				var fps = parseFloat(responses[1]);
+				if (!isFinite(fps) || fps <= 0) fps = 0;
+
+				var selectedId = normalizeKeyframeId(imgId);
+				var selectedIndex = keyframes.findIndex(function (frameId) {
+					return normalizeKeyframeId(frameId) === selectedId;
+				});
+				var priorityRadius = 12;
+				var table = [];
+
+			for (var i = 0; i < keyframes.length; i++) {
+				var frameName = keyframes[i];
+				var path = videoId + "/" + frameName;
+				var isSelected = i === selectedIndex;
+				var selectedDistance = selectedIndex >= 0 ? Math.abs(i - selectedIndex) : Infinity;
 
 				if (i % 6 == 0) {
 					//table += "<div class='row' style='border-bottom: 3px dotted #808; padding:10px'>"
-					table += "<div class='row'>"
+					table.push("<div class='row'>");
 				}
 
-				let imgAttrs = (imgId == keyframes[i]) ?
-					`class="rounded videoSummarySelected" id="${keyframes[i].split("\\.")[0]}"` :
-					`class="rounded"`;
+				let imgAttrs = isSelected ?
+					`class="rounded videoSummarySelected keyframe-preview-trigger" id="${normalizeKeyframeId(frameName)}"` :
+					`class="rounded keyframe-preview-trigger"`;
+				let cardClass = isSelected ?
+					"result-border selected-keyframe-card" : "result-border";
+				let frameMatch = frameName.match(/-(\d+)(?:\.[^.]+)?$/);
+				let frameNumber = frameMatch ? parseInt(frameMatch[1], 10) : NaN;
+				let milliseconds = (fps > 0 && isFinite(frameNumber)) ? (frameNumber / fps) * 1000 : NaN;
+				let timeTooltip = isFinite(milliseconds) ?
+					`Frame ${frameNumber} • ${milliseconds.toFixed(2)} ms` :
+					`Frame ${frameName}`;
+				let loadingAttrs = isSelected ?
+					`loading="eager" fetchpriority="high" decoding="async"` :
+					selectedDistance <= priorityRadius ?
+						`loading="eager" fetchpriority="auto" decoding="async"` :
+						`loading="lazy" fetchpriority="low" decoding="async"`;
 
 				// hack to replace .jpg with .png if the image is not found
 				// FIXME: remove it when all VISIONE instances will use pngs
 				let hack = `onerror="this.src = this.src.replace('.jpg', '.jpg')"`;
 
-				table += `
+				table.push(`
 				<!--<div class='col-2 with-margin'>-->
-				<div class="result-border" style="border-color: red; padding: 1px; margin: 2px;">
+				<div class="${cardClass}">
 
-					<img loading="lazy" id="${keyframes[i]}" height="120" src="${keyFramesUrl}${path}.jpg" ${hack} title="${keyframes[i]}" ${imgAttrs} />
-					<div class='myalign'>
-						<a style="font-size:12px;" href="indexedData.html?videoId=${videoId}&id=${keyframes[i]}" title="Show Indexed Data" target="_blank" >${keyframes[i]}</a>
-						<a href="#"><i class="fa fa-play" style="font-size: 16px; color: #007bff; padding-left: 5px; padding-right: 5px;" onclick="playVideoWindow('${videoUrl}', '${videoId}', '${keyframes[i]}'); return false;"></i><a/>
-						<span class="pull-right">
-							<a href="#"><i title="Submit result" class="fa fa-arrow-alt-circle-up" style="font-size: 21px; float: right; color: #00AA00; padding-left: 0px;" onclick="submit('${frameName}', '${videoId}'); return false"></i></a>
-						</span>
+					<div class="keyframe-image-wrapper" data-tooltip="${timeTooltip}">
+						<img ${loadingAttrs} id="${keyframes[i]}" height="120" src="${keyFramesUrl}${path}.jpg" ${hack} title="${timeTooltip}" ${imgAttrs} />
+					</div>
+					<div class="keyframe-toolbar">
+						<a class="keyframe-frame-id" href="indexedData.html?videoId=${videoId}&id=${keyframes[i]}" title="Show indexed data for ${keyframes[i]}" target="_blank">${keyframes[i]}</a>
+						<button type="button" class="keyframe-action keyframe-action-video" title="Play video" aria-label="Play video" onclick="playVideoWindow('${videoUrl}', '${videoId}', '${keyframes[i]}'); return false;">
+							<i class="fas fa-video" aria-hidden="true"></i>
+						</button>
+						<button type="button" class="keyframe-action keyframe-action-similarity" title="Visual similarity (DINOv2)" aria-label="Visual similarity (DINOv2)" onclick="runVisualSimilarity('${keyframes[i]}'); return false;">
+							<i class="fas fa-clone" aria-hidden="true"></i>
+						</button>
+						<button type="button" class="keyframe-action keyframe-action-submit" title="Submit result" aria-label="Submit result" onclick="submit('${frameName}', '${videoId}'); return false;">
+							<i class="fas fa-paper-plane" aria-hidden="true"></i>
+						</button>
 					</div>
 				</div>
-				`;
+				`);
 
 				if (i % 6 == 5) {
-					table += "</div>";
+					table.push("</div>");
 				}
 			}
 
-			$("#keyframes").append(table);
+			if (keyframes.length % 6 !== 0) table.push("</div>");
+			document.getElementById("keyframes").innerHTML = table.join("");
+			requestAnimationFrame(function () {
+				requestAnimationFrame(focusSelectedFrame);
+			});
+			});
 		}
 
-		loadConfig().then(loadPage).then(function () {window.location.href = '#' + imgId;}).catch(function (error) {console.error('Error:', error);});
+		function closeKeyframeImageModal() {
+			$("#keyframeImageModal").prop("hidden", true);
+			$(".keyframe-image-modal-content").attr("src", "");
+		}
+
+		$("#keyframes").on("click", ".keyframe-preview-trigger", function () {
+			$(".keyframe-image-modal-content")
+				.attr("src", this.src)
+				.attr("alt", this.title || "Keyframe preview");
+			$("#keyframeImageModal").prop("hidden", false);
+		});
+
+		$("#returnToSelectedFrame").on("click", function (event) {
+			event.preventDefault();
+			var selectedFrame = document.querySelector("#keyframes .videoSummarySelected");
+			if (selectedFrame)
+				selectedFrame.scrollIntoView({ behavior: "smooth", block: "center" });
+		});
+
+		$("#keyframeImageModal").on("click", function (event) {
+			if (event.target === this || $(event.target).hasClass("keyframe-image-modal-close"))
+				closeKeyframeImageModal();
+		});
+
+		$(document).on("keydown", function (event) {
+			if (event.key === "Escape")
+				closeKeyframeImageModal();
+		});
+
+		loadConfig().then(loadPage).catch(function (error) {console.error('Error:', error);});
 
 
 	</script>

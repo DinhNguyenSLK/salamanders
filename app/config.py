@@ -11,8 +11,13 @@ class Settings(BaseSettings):
     )
     OPENROUTER_URL: str
     OPENROUTER_API: str
+    SALAMANDERS_KEY: str = ""
+    SALAMANDERS_SUBMISSION_URL: str = (
+        "http://171.244.37.116:18111/api/v1/submissions"
+    )
 
     class Config:
-        env_file = ".env"
+        # Resolve from this file so the backend always reads app/.env.
+        env_file = Path(__file__).resolve().parent / ".env"
 
 settings = Settings()
