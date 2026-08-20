@@ -1,0 +1,104 @@
+.custom-submit-type-options {
+  border: 0;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0 0 9px;
+  padding: 0;
+}
+
+.custom-submit-type-options legend {
+  color: #555;
+  font-size: 12px;
+  font-weight: 700;
+  grid-column: 1 / -1;
+  margin-bottom: 4px;
+}
+
+.submit-settings-card .custom-submit-type-option {
+  align-items: center;
+  background: #f7f7f7;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 6px;
+  justify-content: center;
+  margin: 0;
+  padding: 6px 9px;
+}
+
+.submit-settings-card .custom-submit-type-option:has(input:checked) {
+  background: #fbe9eb;
+  border-color: #880718;
+  color: #880718;
+}
+
+.submit-settings-card .custom-submit-type-option input {
+  display: inline-block;
+  margin: 0;
+  padding: 0;
+  width: auto;
+}
+
+.custom-submit-settings-card {
+  width: min(360px, calc(100vw - 24px));
+}
+
+.custom-submit-settings-card[data-submission-type="CUSTOM"] .dres-submit-setting {
+  display: none;
+}
+
+.custom-submit-settings[hidden],
+.custom-answer-field[hidden] {
+  display: none;
+}
+
+.custom-query-zip-status {
+  background: #f7f7f7;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  color: #555;
+  font-size: 12px;
+  line-height: 1.35;
+  margin: 8px 0 0;
+  padding: 7px;
+}
+
+.custom-query-zip-status[data-state="success"] {
+  background: #edf8f1;
+  border-color: #9bc9aa;
+  color: #146c43;
+}
+
+.custom-query-zip-status[data-state="error"] {
+  background: #fff0f1;
+  border-color: #e0a1a6;
+  color: #a41318;
+}
+
+.custom-query-select {
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-sizing: border-box;
+  display: block;
+  margin-top: 3px;
+  padding: 6px;
+  width: 100%;
+}
+
+.custom-query-preview {
+  background: #f7f7f7;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  margin: 8px 0;
+  max-height: 150px;
+  min-height: 58px;
+  overflow: auto;
+  padding: 8px;
+  white-space: pre-wrap;
+}
