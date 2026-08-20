@@ -2333,13 +2333,79 @@ function formatExternalSubmissionResponse(response, body) {
 
 function getSubmissionQueryName() {
   const localInput = document.getElementById("queryName");
-  if (localInput) return localInput.value.trim();
-  try {
-    return window.opener?.document?.getElementById("queryName")?.value.trim() || "";
-  } catch (_) {
-    return "";
+  let val = localInput ? localInput.value.trim() : "";
+
+  if (!val) {
+    try {
+      val = (localStorage.getItem("queryName") || "").trim();
+    } catch (_) {}
   }
+
+  if (!val) {
+    try {
+      val = window.opener?.document?.getElementById("queryName")?.value.trim() || "";
+    } catch (_) {}
+  }
+
+  if (!val) {
+    try {
+      val = (window.opener?.localStorage?.getItem("queryName") || "").trim();
+    } catch (_) {}
+  }
+
+  if (!val) {
+    const inputVal = prompt("Enter Query name before submitting:", "");
+    if (inputVal && inputVal.trim()) {
+      val = inputVal.trim();
+    }
+  }
+
+  if (val) {
+    try {
+      localStorage.setItem("queryName", val);
+    } catch (_) {}
+    if (localInput && localInput.value !== val) {
+      localInput.value = val;
+    }
+  }
+
+  return val;
 }
+
+$(document).on("input change keyup", "#queryName", function () {
+  const val = $(this).val().trim();
+  try {
+    if (val) {
+      localStorage.setItem("queryName", val);
+    } else {
+      localStorage.removeItem("queryName");
+    }
+  } catch (_) {}
+});
+
+window.addEventListener("storage", function (event) {
+  if (event.key === "queryName") {
+    const val = event.newValue || "";
+    const localInput = document.getElementById("queryName");
+    if (localInput && localInput.value !== val) {
+      localInput.value = val;
+    }
+  }
+});
+
+$(function () {
+  const localInput = document.getElementById("queryName");
+  if (localInput) {
+    try {
+      const saved = (localStorage.getItem("queryName") || "").trim();
+      if (saved) {
+        localInput.value = saved;
+      } else if (localInput.value.trim()) {
+        localStorage.setItem("queryName", localInput.value.trim());
+      }
+    } catch (_) {}
+  }
+});
 
 function getSubmissionImageUrl(selectedItem) {
   if (selectedItem?.thumb) return selectedItem.thumb;

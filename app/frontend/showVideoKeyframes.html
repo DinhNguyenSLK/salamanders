@@ -291,7 +291,7 @@
 	<script src="js/jquery-3.3.1.min.js"></script>
 	<script src="js/jquery-ui.min.js"></script>
 	<script src="js/js-yaml.min.js"></script>
-	<script src="js/visione.js?v=45"></script>
+	<script src="js/visione.js?v=46"></script>
 </head>
 
 <body class="page-keyframes">
@@ -300,6 +300,8 @@
 		<a id="videoURL" class="keyframes-header-link" title="Play video" href=""></a>
 		<span class="keyframes-header-label">Keyframe</span>
 		<a id="imgId" class="keyframes-header-link" title="Go to keyframe" href=""></a>
+		<span class="keyframes-header-label">Query</span>
+		<input id="queryName" class="keyframes-header-link" style="width: 140px; border: 1px solid #e2cba9; padding: 2px 8px; font-size: 13px;" placeholder="Query name..." autocomplete="off" />
 	</header>
 	<table align="center">
 		<tr>
@@ -397,6 +399,7 @@
 			$("#videoURL").text(videoId);
 			$("#imgId").attr("href", "#" + imgId);
 			$("#imgId").text(imgId);
+			$("#queryName").val(getSubmissionQueryName());
 			$("#returnToSelectedFrame").attr("href", "#" + imgId).prop("hidden", !imgId);
 
 			var keyframesRequest = $.ajax({

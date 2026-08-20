@@ -10,7 +10,7 @@
   <script src="https://vjs.zencdn.net/7.18.1/video.min.js"></script>
   <script src="js/jquery-3.3.1.min.js"></script>
   <script src="js/js-yaml.min.js"></script>
-  <script src="js/visione.js?v=45"></script>
+  <script src="js/visione.js?v=46"></script>
   <script src="js/videoYoutubeUrls.js?v=1"></script>
   <style>
     * { box-sizing: border-box; }
@@ -240,11 +240,25 @@
       <span class="label"> &nbsp;|&nbsp; FPS: </span>
       <span class="value" id="fpsValue">—</span>
     </div>
+
+  <div id="frameHud">
+    <div>
+      <span class="label">Frame (ffmpeg): </span>
+      <span class="value" id="frameIndex">—</span>
+      <span class="label"> &nbsp;|&nbsp; Time: </span>
+      <span class="value" id="timeValue">—</span>
+      <span class="label"> &nbsp;|&nbsp; Duration: </span>
+      <span class="value" id="durationValue">—</span>
+      <span class="label"> &nbsp;|&nbsp; FPS: </span>
+      <span class="value" id="fpsValue">—</span>
+    </div>
     <div class="hint">Cuộn chuột trên video: lên = tua tới (+1 frame), xuống = tua lui (−1 frame)</div>
   </div>
 
   <div id="actions">
     <div id="fallbackNotice">Local video unavailable. YouTube fallback is positioned by timestamp; frame-level accuracy is approximate.</div>
+    <span class="label" style="font-size: 13px; font-weight: bold;">Query: </span>
+    <input id="queryName" style="padding: 4px 8px; border-radius: 4px; border: 1px solid #ccc; width: 140px; margin-right: 6px;" placeholder="Query name..." autocomplete="off" />
     <button id="submit"
       title="Submit result at current play time"
       onclick="submitAtCurrentPlayTime();">
@@ -253,6 +267,9 @@
   </div>
 
 <script type="text/javascript">
+  $(function () {
+    $("#queryName").val(getSubmissionQueryName());
+  });
   var myPlayer;
   var videoFps = 25;
   var hudRaf = null;
