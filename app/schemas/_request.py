@@ -19,16 +19,19 @@ class QueryItems(BaseModel):
 
 
 class ParamItems(BaseModel):
-    textual_model: Literal["metaclip2", "siglip2", "align"] = "metaclip2"
+    textual_model: Literal["metaclip2", "siglip2", "align"] = "siglip2"
     operator: Literal["or", "and"] = "and"
     range: Literal["lt", "gt", "eq"] = "eq"
     asr_mode: Literal["text", "vector"] = "text"
     ocr_mode: Literal["text", "vector"] = "text"
+    asr_fuzziness: str | int = 0
+    ocr_fuzziness: str | int = 0
 
+    
 class SearchParams(BaseModel):
     query: list[QueryItems]
     parameters: list[ParamItems]
-    video_type: Literal["all", "cycling", "news", "cooking", "lecture"] = "all"
+    video_type: Literal["all", "cycling", "news", "dance", "cooking", "lecture", "lifelog"] = "all"
     k: int = Field(default=1000, ge=100, le=10000, description="Top-k kết quả tốt nhất")
     n_frames_per_round: int = Field(default=10, ge=3, le=30, description="Số frame cho mỗi video id")
 

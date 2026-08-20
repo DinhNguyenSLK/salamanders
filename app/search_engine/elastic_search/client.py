@@ -7,7 +7,7 @@ ES_INDEX = settings.ES_INDEX
 class ElasticSearchClientSingleton:
     """ Đảm bảo chỉ có 1 client trong suốt vòng đời của APP """
 
-    _client: AsyncElasticsearch | None = None
+    _client: AsyncElasticsearch | None = None   # _client là state khởi tạo cho cả vòng đời của app
 
     @classmethod
     def get_client(cls) -> AsyncElasticsearch:
@@ -19,7 +19,7 @@ class ElasticSearchClientSingleton:
     @classmethod
     async def close(cls):
         if cls._client is not None:
-            await cls._instance.close
+            await cls._client.close
             cls._client = None
 
 def get_es_client() -> AsyncElasticsearch:

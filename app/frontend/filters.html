@@ -7,14 +7,11 @@
 	<div class="qbe-body">
 		<input type="hidden" value="" id="objId">
 		<input id="urlToUpload" name="url" type="text" class="qbe-input" placeholder="https://example.com/image.jpg"
-			onkeydown="if(event.key==='Enter'){event.preventDefault();queryImg();}">
+			onkeydown="if(event.key==='Enter' && !event.isComposing){event.preventDefault();queryImg();}">
 		<label id="imageToUploadLabel" class="qbe-file-label" style="display: none;">
-			<input id="imageToUpload" name="imgFile" type="file" accept="image/*">
+			<input id="imageToUpload" name="imgFile" type="file" accept="image/*" onchange="previewUploadedQueryImage(this)">
 			<span>Choose image…</span>
 		</label>
-		<button type="button" id="queryByExample" class="qbe-search-btn" title="Search" onclick="queryImg(); return false;">
-			<i class="fa fa-search"></i> Search
-		</button>
 	</div>
 	<div class="preview qbe-preview" id="qbeblock" style="display: none;">
 		<img src="" id="qbeImg" alt="query preview">

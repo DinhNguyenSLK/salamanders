@@ -117,3 +117,87 @@
 #qbe {
   padding: 0;
 }
+
+/* Earth-tone theme overrides. */
+.qbe-panel {
+  border-color: var(--earth-border);
+  background: var(--earth-surface-soft);
+}
+
+.qbe-title {
+  color: var(--earth-brown);
+}
+
+.qbe-tab,
+.qbe-input,
+.qbe-file-label {
+  border-color: var(--earth-border);
+  background: var(--earth-surface);
+  color: var(--earth-text);
+}
+
+.qbe-tab.active,
+.qbe-search-btn {
+  background: var(--earth-brown);
+  border-color: var(--earth-brown);
+  color: #fffaf0;
+}
+
+.qbe-search-btn:hover {
+  background: var(--earth-brown-dark);
+}
+
+.qbe-preview img {
+  border-color: var(--earth-border);
+}
+
+.qbe-remove {
+  background: var(--earth-gold);
+}
+
+/* Match the light search-card palette. */
+.qbe-panel {
+  background: #fff;
+  border-color: #f3e9dd;
+}
+
+.qbe-tab:not(.active),
+.qbe-file-label {
+  background: #fff3e4 !important;
+  border-color: #ecd9bf !important;
+}
+
+.qbe-tab.active {
+  background: #aa6a20 !important;
+  border-color: #aa6a20 !important;
+  color: #fffaf0;
+}
+
+.qbe-input {
+  background: #fff3e4 !important;
+  border-color: #ecd9bf !important;
+}
+
+/* Keep the QBE action visible while the query fields scroll. */
+.qbe-search-fixed {
+  background: #fff;
+  border-top: 1px solid #f3e9dd;
+  flex-shrink: 0;
+  padding: 8px 0 0;
+}
+
+.qbe-search-fixed .qbe-search-btn {
+  background: #d97706;
+  border: 1px solid #b45309;
+  box-shadow: 0 2px 5px rgba(180, 83, 9, 0.28);
+  font-weight: 700;
+  width: 100%;
+}
+
+.qbe-search-fixed .qbe-search-btn:hover,
+.qbe-search-fixed .qbe-search-btn:focus-visible {
+  background: #b45309;
+  border-color: #92400e;
+  box-shadow: 0 3px 7px rgba(146, 64, 14, 0.34);
+  outline: none;
+}

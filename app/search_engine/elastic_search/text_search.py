@@ -20,10 +20,10 @@ class MatchQueryTemplate(BaseElasticSearchTemplate):
 
     def _build_query(
             self,
-            match_dict: dict[str, str],
-
+            match_dict: dict[str, Any],
+            **kwargs: Any,
     ) -> dict[str, Any]:
-        
+        field = match_dict.get("field")
         operator = match_dict.get("operator", "or")
         fuzziness = match_dict.get("fuzziness", None)
 
@@ -33,13 +33,26 @@ class MatchQueryTemplate(BaseElasticSearchTemplate):
         }
 
         if fuzziness:
+            print('có fuzziness')
             match_params['fuzziness'] = fuzziness
 
-        return {
+        match_query = {
             "match": {
-                match_dict.get('field'): match_params
+                field: match_params
             }
         }
+
+        if field not in self.MATCHED_TERMS_SCORE_FIELDS:
+            return match_query
+
+        matched_terms_lambda = kwargs.get(
+            "matched_terms_lambda",
+            match_dict.get("matched_terms_lambda"),
+        )
+        return self._apply_matched_terms_score(
+            match_query,
+            matched_terms_lambda=5,
+        )
     
 class ShouldTermQueryTemplate(BaseElasticSearchTemplate):
     def _build_query(

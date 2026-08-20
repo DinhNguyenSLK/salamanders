@@ -22,6 +22,20 @@ function changeQueryBySampleMod(mode) {
 	}
 }
 
+function previewUploadedQueryImage(fileInput) {
+	const file = fileInput && fileInput.files && fileInput.files[0];
+	const previewBlock = document.getElementById('qbeblock');
+	const previewImage = document.getElementById('qbeImg');
+	if (!file || !previewBlock || !previewImage) return;
+
+	const reader = new FileReader();
+	reader.onload = function(e) {
+		previewImage.src = e.target.result;
+		previewBlock.style.display = 'block';
+	};
+	reader.readAsDataURL(file);
+}
+
 function queryImg() {
 	let queryUrl = ($('#urlToUpload').val() || '').trim();
 
@@ -53,8 +67,8 @@ function queryImg() {
 }
 
 function resetQueryImg() {
-	const qbe = document.getElementById('qbe');
-	if (qbe) qbe.removeAttribute('src');
+	const qbeImg = document.getElementById('qbeImg');
+	if (qbeImg) qbeImg.removeAttribute('src');
 	document.getElementById('urlToUpload').value = '';
 	const fileInput = document.getElementById('imageToUpload');
 	if (fileInput) fileInput.value = '';
@@ -64,7 +78,7 @@ function resetQueryImg() {
 
 function clearQuery() {
 	if (document.getElementById('urlToUpload').value.trim() == '')
-		document.getElementById('qbe').style.display = 'none';
+		document.getElementById('qbeblock').style.display = 'none';
 }
 
 function trim(str) {

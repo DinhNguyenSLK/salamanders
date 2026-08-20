@@ -5,6 +5,7 @@ const searchFormID = {
 const MAX_TEMPORAL_SCENES = 5;
 
 function toggleFieldPanel(btn) {
+  if (typeof event !== "undefined" && event.target && event.target.closest(".field-clear-btn")) return;
   const panel = btn.closest(".field-panel");
   if (!panel) return;
   panel.classList.toggle("collapsed");
@@ -12,6 +13,26 @@ function toggleFieldPanel(btn) {
     "aria-expanded",
     panel.classList.contains("collapsed") ? "false" : "true",
   );
+}
+
+function orderScenePanels(canvasID) {
+  const scene = document.getElementById(`canvasTab${canvasID}`);
+  const fieldGroup = document.getElementById(`block${canvasID}`);
+  if (!scene || !fieldGroup) return;
+
+  const panelOrder = [
+    document.getElementById(`textualOptions${canvasID}`),
+    document.getElementById(`textual${canvasID}_container`),
+    document.getElementById(`panel_ocr${canvasID}`),
+    document.getElementById(`panel_asr${canvasID}`),
+    document.getElementById(`panel_rewrite${canvasID}`),
+    document.getElementById(`panel_objects${canvasID}`),
+    document.getElementById(`panel_not${canvasID}`),
+    document.getElementById(`panel_tags${canvasID}`),
+  ];
+
+  panelOrder.forEach((panel) => panel && scene.appendChild(panel));
+  fieldGroup.remove();
 }
 
 function sceneInfoText(canvasID) {
@@ -75,7 +96,7 @@ const searchForm = (
 			</div>
 		</div>
 
-		<div class="textualOptions${canvasID} mode-row" id="textualOptions${canvasID}">
+		<div class="textualOptions${canvasID} mode-row compact-mode-picker" id="textualOptions${canvasID}">
 			${modesHtml}
 		</div>
 
@@ -84,9 +105,7 @@ const searchForm = (
 				<div class="Icon-inside">
 					<textarea id="textual${canvasID}" type="text" class="textualquery${canvasID} font-normal" rows="2"
 						placeholder="${placeholder}"></textarea>
-					<i id="cancelText${canvasID}" class="fa fa-times fa-lg fa-fw cancel-text-icon" aria-hidden="true"></i>
-					<i class="fa fa-search fa-lg fa-fw search-text-icon" title="Search"
-						onclick="queryByTextual(); return false;"></i>
+					<span id="cancelText${canvasID}" class="field-clear-btn input-clear-btn" data-clear-field="textual" data-scene-idx="${canvasID}" title="Clear textual query" aria-label="Clear textual query">&times;</span>
 				</div>
 			</div>
 		</div>
@@ -123,8 +142,8 @@ const searchForm = (
 			</div>
 		</div>
 
-		<div class="field-panel" id="panel_objects${canvasID}">
-			<button type="button" class="field-panel-toggle" aria-expanded="true" onclick="toggleFieldPanel(this)">Objects / grid</button>
+		<div class="field-panel collapsed" id="panel_objects${canvasID}">
+			<button type="button" class="field-panel-toggle" aria-expanded="false" onclick="toggleFieldPanel(this)">Objects / grid</button>
 			<div class="field-panel-body">
 				<div class="scene-controls">
 					<span class="font-tiny">
@@ -147,6 +166,7 @@ const searchForm = (
 					<div id="overlay${canvasID}">
 						<div align="center" id="text${canvasID}" style="color: gray;">Disabled</div>
 					</div>
+					<span class="field-clear-btn canvas-clear-btn" data-clear-field="objects" data-scene-idx="${canvasID}" title="Clear object grid" aria-label="Clear object grid">&times;</span>
 					<div id="canvasdiv${canvasID}">
 						<canvas id="canvas${canvasID}" width=${canvasWidth} height=${canvasHeight}></canvas>
 					</div>
@@ -165,15 +185,15 @@ const searchForm = (
 						<button type="button" class="object-count-range-btn" data-range="gt" aria-pressed="false">gt</button>
 						<button type="button" class="object-count-range-btn" data-range="eq" aria-pressed="true">eq</button>
 					</div>
-					<textarea id="not${canvasID}" class="font-normal field-input" rows="2"
-						data-range="eq" placeholder="e.g. 2 person 3 car 0 dog"></textarea>
+					<div class="input-with-clear"><textarea id="not${canvasID}" class="font-normal field-input" rows="2"
+						data-range="eq" placeholder="e.g. 2 person 3 car 0 dog"></textarea><span class="field-clear-btn input-clear-btn" data-clear-field="not" data-scene-idx="${canvasID}" title="Clear object count" aria-label="Clear object count">&times;</span></div>
 				</div>
 			</div>
 
-			<div class="field-panel collapsed" id="panel_ocr${canvasID}">
-				<button type="button" class="field-panel-toggle" aria-expanded="false" onclick="toggleFieldPanel(this)">OCR</button>
+			<div class="field-panel" id="panel_ocr${canvasID}">
+				<button type="button" class="field-panel-toggle" aria-expanded="true" onclick="toggleFieldPanel(this)">OCR</button>
 				<div class="field-panel-body">
-					<div class="mode-row asr-modes">
+					<div class="mode-row asr-modes compact-mode-picker fuzziness-mode-row">
 						<label class="mode-chip">
 							<input type="radio" name="ocrMode${canvasID}" value="text" checked>
 							<span>Text</span>
@@ -182,16 +202,30 @@ const searchForm = (
 							<input type="radio" name="ocrMode${canvasID}" value="vector">
 							<span>Vector</span>
 						</label>
+						<label class="fuzziness-picker" for="ocrFuzziness${canvasID}" title="OCR fuzziness">
+							<span class="fuzziness-picker-label">Fuzzy</span>
+							<span class="fuzziness-select-shell">
+								<select id="ocrFuzziness${canvasID}" aria-label="OCR fuzziness">
+									<option value="AUTO">AUTO</option>
+									<option value="0" selected>0</option>
+									<option value="1">1</option>
+									<option value="2">2</option>
+									<option value="3">3</option>
+									<option value="4">4</option>
+									<option value="5">5</option>
+								</select>
+							</span>
+						</label>
 					</div>
-					<textarea id="ocr${canvasID}" class="font-normal field-input" rows="2"
-						placeholder="Text visible in the frame..."></textarea>
+					<div class="input-with-clear"><textarea id="ocr${canvasID}" class="font-normal field-input" rows="2"
+						placeholder="Text visible in the frame..."></textarea><span class="field-clear-btn input-clear-btn" data-clear-field="ocr" data-scene-idx="${canvasID}" title="Clear OCR" aria-label="Clear OCR">&times;</span></div>
 				</div>
 			</div>
 
-			<div class="field-panel collapsed" id="panel_asr${canvasID}">
-				<button type="button" class="field-panel-toggle" aria-expanded="false" onclick="toggleFieldPanel(this)">ASR</button>
+			<div class="field-panel" id="panel_asr${canvasID}">
+				<button type="button" class="field-panel-toggle" aria-expanded="true" onclick="toggleFieldPanel(this)">ASR</button>
 				<div class="field-panel-body">
-					<div class="mode-row asr-modes">
+					<div class="mode-row asr-modes compact-mode-picker fuzziness-mode-row">
 						<label class="mode-chip">
 							<input type="radio" name="asrMode${canvasID}" value="text" checked>
 							<span>Text</span>
@@ -200,18 +234,31 @@ const searchForm = (
 							<input type="radio" name="asrMode${canvasID}" value="vector">
 							<span>Vector</span>
 						</label>
-						
+						<label class="fuzziness-picker" for="asrFuzziness${canvasID}" title="ASR fuzziness">
+							<span class="fuzziness-picker-label">Fuzzy</span>
+							<span class="fuzziness-select-shell">
+								<select id="asrFuzziness${canvasID}" aria-label="ASR fuzziness">
+									<option value="AUTO">AUTO</option>
+									<option value="0" selected>0</option>
+									<option value="1">1</option>
+									<option value="2">2</option>
+									<option value="3">3</option>
+									<option value="4">4</option>
+									<option value="5">5</option>
+								</select>
+							</span>
+						</label>
 					</div>
-					<textarea id="asr${canvasID}" class="font-normal field-input" rows="2"
-						placeholder="Spoken / transcribed text..."></textarea>
+					<div class="input-with-clear"><textarea id="asr${canvasID}" class="font-normal field-input" rows="2"
+						placeholder="Spoken / transcribed text..."></textarea><span class="field-clear-btn input-clear-btn" data-clear-field="asr" data-scene-idx="${canvasID}" title="Clear ASR" aria-label="Clear ASR">&times;</span></div>
 				</div>
 			</div>
 
 			<div class="field-panel collapsed" id="panel_tags${canvasID}">
 				<button type="button" class="field-panel-toggle" aria-expanded="false" onclick="toggleFieldPanel(this)">Tags</button>
 				<div class="field-panel-body">
-					<textarea id="tags${canvasID}" class="font-normal field-input" rows="2"
-						placeholder="<tag_one>, <tag two>, <news>"></textarea>
+					<div class="input-with-clear"><textarea id="tags${canvasID}" class="font-normal field-input" rows="2"
+						placeholder="<tag_one>, <tag two>, <news>"></textarea><span class="field-clear-btn input-clear-btn" data-clear-field="tags" data-scene-idx="${canvasID}" title="Clear tags" aria-label="Clear tags">&times;</span></div>
 				</div>
 			</div>
 		</div>

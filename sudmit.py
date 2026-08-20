@@ -1,6 +1,7 @@
 import requests
 
-url = "http://192.168.28.151:5000/api/v2/submit/d1ed5c2b-7091-4f87-bc40-b87718da9ba6"
+evaluation_id = "8467dad2-45e5-4fad-ab44-0fb1bd869eb5"
+url = f"http://192.168.28.151:5000/api/v2/submit/{evaluation_id}"
 session_id = "CaHbbfLxH_2Er4X85lbC8yd9qSiEAc1F"
 
 
@@ -33,10 +34,28 @@ def submit_KIS(
     print(response.text)
 
 
-
+def submit_QA(
+        text
+):
+    payload = {
+            "answerSets": [
+                {
+                    "answers": [
+                        {
+                            "text": text
+                        }
+                    ]
+                }
+            ]
+        }
+    
+    response = requests.post(
+        url,
+        params={"session": session_id},
+        json=payload
+    )
+    
 if __name__ == "__main__":
-    submit_KIS(
-        video_id=  "L29_V014"  ,
-        start_ms=   83520,
-        end_ms=     100000
+    submit_QA(
+        "6768"
     )

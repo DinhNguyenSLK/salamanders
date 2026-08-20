@@ -467,6 +467,7 @@ function mountSearchScene(idx) {
   } else {
     $("#searchTab").append(html);
   }
+  orderScenePanels(idx);
   const canvas = get_canvas(idx);
   canvases[idx] = canvas;
   syncCanvasAliases();
@@ -539,6 +540,35 @@ function bindSearchSceneDelegates() {
   const $tab = $("#searchTab");
   $tab.off(".sceneDyn");
 
+  $tab.on("click.sceneDyn", ".field-clear-btn", function (event) {
+    event.preventDefault();
+    event.stopPropagation();
+    const idx = parseInt($(this).attr("data-scene-idx"), 10);
+    const field = $(this).attr("data-clear-field");
+    if (isNaN(idx) || !field) return;
+
+    if (field === "objects") {
+      const canvas = canvases[idx];
+      if (canvas) {
+        canvas.discardActiveObject();
+        canvas.getObjects().slice().forEach(function (object) {
+          if (object.get("type") !== "line") {
+            $("#" + object.get("uuid")).hide();
+            canvas.remove(object);
+          }
+        });
+        canvas.renderAll();
+      }
+    } else {
+      $("#" + field + idx).val("");
+      if (field === "textual") {
+        $("#cancelText" + idx).hide();
+      }
+    }
+    isCanvasClean[idx] = false;
+    searchByForm();
+  });
+
   function sceneIdxFromFieldId(id, prefix) {
     return parseInt(String(id).replace(prefix, ""), 10);
   }
@@ -562,19 +592,17 @@ function bindSearchSceneDelegates() {
     },
   );
 
-  $tab.on("keyup.sceneDyn", 'textarea[id^="textual"]', function (event) {
+  $tab.on("keydown.sceneDyn", 'textarea[id^="textual"]', function (event) {
     const idx = parseInt(this.id.replace("textual", ""), 10);
     if (isNaN(idx)) return;
     markSceneDirty(idx);
     const cancel = document.getElementById("cancelText" + idx);
-    if (event.keyCode === 13) {
-      $(this).val(
-        $(this)
-          .val()
-          .replace(/(\r\n|\n|\r)/gm, ""),
-      );
-      if ($(this).val().length > 0) queryByTextual();
+    if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if ($(this).val().trim().length > 0) searchByForm();
       $(this).blur();
+      return false;
     }
     if (cancel) cancel.style.display = $(this).val() === "" ? "none" : "block";
   });
@@ -1313,6 +1341,11 @@ function normalizeQueryText(text) {
     .replace(/\s+/g, " ");
 }
 
+function getFuzzinessParameter(field, idx) {
+  const value = $("#" + field + "Fuzziness" + idx).val() || "0";
+  return value === "AUTO" ? "AUTO" : Number(value);
+}
+
 function cell2Text(idx) {
   // Builds one QueryItems + ParamItems pair (schemas/_request.py) for scene idx.
   let queryObj = {};
@@ -1337,6 +1370,7 @@ function cell2Text(idx) {
       queryObj.ocr = ocr.toLowerCase();
       queryParameters.ocr_mode =
         $('input[name="ocrMode' + idx + '"]:checked').val() || "text";
+      queryParameters.ocr_fuzziness = getFuzzinessParameter("ocr", idx);
     }
   }
 
@@ -1347,6 +1381,7 @@ function cell2Text(idx) {
       queryObj.asr = asr.toLowerCase();
       queryParameters.asr_mode =
         $('input[name="asrMode' + idx + '"]:checked').val() || "text";
+      queryParameters.asr_fuzziness = getFuzzinessParameter("asr", idx);
     }
   }
 
@@ -1475,6 +1510,8 @@ function searchByLink(queryID) {
 }
 
 function searchByForm() {
+  const utilityFilter = document.querySelector(".utility-filter");
+  if (utilityFilter) utilityFilter.open = false;
   // Một request duy nhất cho toàn bộ temporal scenes — không gọi API từng scene.
   const { queryItems, paramItems } = collectTemporalSearchItems();
   prevQuery = queryItems;
@@ -1518,16 +1555,24 @@ function groupResultsByVideo(data) {
   for (let i = 0; i < list.length; i++) {
     const item = list[i];
     const vid = item.videoId;
-    if (!groups.has(vid)) groups.set(vid, []);
-    groups.get(vid).push(item);
+    if (!groups.has(vid)) groups.set(vid, { frames: [], firstIndex: i });
+    groups.get(vid).frames.push(item);
   }
 
-  const ordered = [];
-  for (const frames of groups.values()) {
-    frames.sort(function (a, b) {
+  const rankedGroups = Array.from(groups.values());
+  rankedGroups.forEach(function (group) {
+    group.frames.sort(function (a, b) {
       return (b.score || 0) - (a.score || 0);
     });
-    for (let j = 0; j < frames.length; j++) ordered.push(frames[j]);
+    group.bestScore = group.frames.length ? group.frames[0].score || 0 : 0;
+  });
+  rankedGroups.sort(function (a, b) {
+    return b.bestScore - a.bestScore || a.firstIndex - b.firstIndex;
+  });
+
+  const ordered = [];
+  for (const group of rankedGroups) {
+    for (let j = 0; j < group.frames.length; j++) ordered.push(group.frames[j]);
   }
   return ordered;
 }
@@ -1538,6 +1583,17 @@ function hideLoadingSpinner() {
 }
 
 var _searchXhr = null;
+
+function setSearchLatency(milliseconds, state) {
+  const badge = document.getElementById("searchLatency");
+  const value = document.getElementById("searchLatencyValue");
+  if (!badge || !value) return;
+
+  badge.dataset.state = state || "ready";
+  if (state === "loading") value.textContent = "...";
+  else if (state === "error") value.textContent = "error";
+  else value.textContent = (milliseconds / 1000).toFixed(3) + "s";
+}
 
 function search2(payload) {
   res = null;
@@ -1568,8 +1624,12 @@ function search2(payload) {
       return;
     }
 
+    cancelBackgroundResultRendering();
+    resultsRenderGeneration++;
     latestQuery = JSON.stringify(payload);
     console.log("POST /search/ scenes=" + payload.query.length, payload);
+    const requestStartedAt = performance.now();
+    setSearchLatency(null, "loading");
 
     if (_searchXhr && _searchXhr.readyState !== 4) {
       try {
@@ -1587,11 +1647,13 @@ function search2(payload) {
       url: urlVBSService.replace(/\/$/, "") + "/search/",
       success: function (data) {
         _searchXhr = null;
+        setSearchLatency(performance.now() - requestStartedAt, "ready");
         setResults(data);
       },
       error: function (xhr, status, error) {
         if (status === "abort") return;
         _searchXhr = null;
+        setSearchLatency(null, "error");
         console.error("search failed:", status, error, xhr && xhr.responseText);
         hideLoadingSpinner();
         setResults("");
@@ -1787,7 +1849,13 @@ function setTopK(value, triggerSearch = false) {
   const label = document.getElementById("kValue");
   if (label) label.textContent = topK;
   const slider = document.getElementById("kSlider");
-  if (slider && String(slider.value) !== String(topK)) slider.value = topK;
+  if (slider) {
+    if (String(slider.value) !== String(topK)) slider.value = topK;
+    const min = parseFloat(slider.min) || 100;
+    const max = parseFloat(slider.max) || 10000;
+    const progress = Math.max(0, Math.min(100, ((topK - min) / (max - min)) * 100));
+    slider.style.setProperty("--range-progress", progress + "%");
+  }
   if (triggerSearch) searchByForm();
 }
 
@@ -1828,10 +1896,6 @@ function queryByExample(imgUrl) {
   searchByLink(queryObj);
 }
 
-function queryByTextual() {
-  searchByForm();
-}
-
 function queryByCLIP() {
   searchByForm();
 }
@@ -1864,6 +1928,8 @@ function displaySimplifiedUI() {
 
 function showResults(data) {
   try {
+    cancelBackgroundResultRendering();
+    resultsRenderGeneration++;
     //to avoid textual boxes overlap. Why???
     displayAdvanced(true);
     //temporary!!!!!!!!!!!
@@ -1899,7 +1965,7 @@ function showResults(data) {
           resColIdx = 1;
           resrowIdx = 0;
           visibleImages = 0;
-          loadImages(0, batchSize);
+          loadImages(0, getVideoBatchEndIndex(0, videoBatchSize));
         }
       } catch (e) {
         console.log(e);
@@ -1919,15 +1985,84 @@ function showResults(data) {
   }
 }
 
-var batchSize = 80;
+var videoBatchSize = 4;
+var backgroundVideoBatchSize = 6;
 var visibleImages = 0;
 var resColIdx = 1;
 var resrowIdx = 0;
 var lastLoadedVideoId = "";
+var resultsBackgroundHandle = null;
+var resultsBackgroundUsesIdleCallback = false;
+var resultsRenderGeneration = 0;
+
+function getVideoBatchEndIndex(startIndex, videoLimit) {
+  if (!Array.isArray(res) || startIndex >= res.length) return startIndex;
+  var currentVideoId = null;
+  var videoCount = 0;
+  var index = startIndex;
+
+  for (; index < res.length; index++) {
+    var videoId = res[index].videoId;
+    if (videoId !== currentVideoId) {
+      if (videoCount >= videoLimit) break;
+      currentVideoId = videoId;
+      videoCount++;
+    }
+  }
+
+  return Math.max(startIndex, index - 1);
+}
+
+function cancelBackgroundResultRendering() {
+  if (resultsBackgroundHandle == null) return;
+  if (resultsBackgroundUsesIdleCallback && window.cancelIdleCallback) {
+    window.cancelIdleCallback(resultsBackgroundHandle);
+  } else {
+    clearTimeout(resultsBackgroundHandle);
+  }
+  resultsBackgroundHandle = null;
+  resultsBackgroundUsesIdleCallback = false;
+}
+
+function scheduleFillResultsViewport() {
+  if (
+    resultsBackgroundHandle != null ||
+    !Array.isArray(res) ||
+    visibleImages >= res.length
+  ) {
+    return;
+  }
+
+  var renderGeneration = resultsRenderGeneration;
+  var renderNextBatch = function () {
+    resultsBackgroundHandle = null;
+    resultsBackgroundUsesIdleCallback = false;
+    if (
+      renderGeneration !== resultsRenderGeneration ||
+      !Array.isArray(res) ||
+      visibleImages >= res.length
+    ) {
+      return;
+    }
+
+    loadImages(
+      visibleImages,
+      getVideoBatchEndIndex(visibleImages, backgroundVideoBatchSize),
+    );
+  };
+
+  if (window.requestIdleCallback) {
+    resultsBackgroundUsesIdleCallback = true;
+    resultsBackgroundHandle = window.requestIdleCallback(renderNextBatch, {
+      timeout: 250,
+    });
+  } else {
+    resultsBackgroundHandle = window.setTimeout(renderNextBatch, 40);
+  }
+}
 
 function loadImages(startIndex, endIndex) {
   if (resrowIdx == 0 && !resMatrix[0]) resMatrix[resrowIdx] = [];
-  let img_loading = "eager";
 
   // Finish the current video even past endIndex so one video stays on one row.
   var extendedBatch = Math.min(endIndex + numResultsPerVideo - 1, res.length);
@@ -1962,7 +2097,7 @@ function loadImages(startIndex, endIndex) {
         videoId +
         "&id=" +
         imgId +
-        '" target="_blank">' +
+        '" target="_blank" onclick="markTopVideoResultAsViewed(this)">' +
         videoId +
         "</a></div>" +
         '<div class="video-frames-scroll" data-videoid="' +
@@ -1977,9 +2112,6 @@ function loadImages(startIndex, endIndex) {
         '#imgGridResults .video-frames-scroll[data-videoid="' + videoId + '"]',
       ).last();
 
-      var preloadedImage = new Image();
-      preloadedImage.src = keyframePath;
-      framesCache[resrowIdx] = preloadedImage;
       lastLoadedVideoId = videoId;
     } else if (!$currentFrames || !$currentFrames.length) {
       $currentFrames = $(
@@ -2006,6 +2138,11 @@ function loadImages(startIndex, endIndex) {
       resColIdx - 1,
     );
 
+    let isHighPriorityVideo = resrowIdx < videoBatchSize;
+    let isTopFrameOfVideo = resColIdx === 1;
+    let imgLoading = isHighPriorityVideo || isTopFrameOfVideo ? "eager" : "lazy";
+    let imgFetchPriority = isHighPriorityVideo ? "high" : "low";
+
     let frameHtml =
       '<div data-videoid="' +
       videoId +
@@ -2016,7 +2153,12 @@ function loadImages(startIndex, endIndex) {
       '" data-col="' +
       (resColIdx - 1) +
       '" class="item">' +
-      imgResult(resultData, borderColors[borderColorsIdx], img_loading) +
+      imgResult(
+        resultData,
+        borderColors[borderColorsIdx],
+        imgLoading,
+        imgFetchPriority,
+      ) +
       "</div>";
     $currentFrames.append(frameHtml);
     resMatrix[resrowIdx][resColIdx - 1] = res[i];
@@ -2096,6 +2238,8 @@ function loadImages(startIndex, endIndex) {
       }
     }
   }
+
+  scheduleFillResultsViewport();
 }
 
 function getResultData(
@@ -2128,24 +2272,12 @@ function getResultData(
 }
 
 function submitQA() {
-  let answ = prompt("Please enter your answering", "");
-  if (answ != null) {
-    submitResult(
-      (id = null),
-      (videoId = null),
-      (textAnswer = answ),
-      (isAsync = true),
-    );
-    try {
-      qaSubmittedTab(answ);
-    } catch (e) {
-      console.log(e);
-    }
-  }
+  return Promise.reject(new Error("QA submission requires a video frame."));
 }
 
 function submitAlert() {
-  if (localStorage.getItem("taskType") != "avs") {
+  // KIS uses the editable submit dialog as its only confirmation step.
+  if (localStorage.getItem("taskType") != "avs" && localStorage.getItem("taskType") != "kis" && localStorage.getItem("taskType") != "qa") {
     if (!confirm("Are you sure you want to submit?")) {
       return false;
     }
@@ -2163,6 +2295,10 @@ function setTaskType(taskType) {
 
   localStorage.setItem("taskType", sessionStorage.getItem("taskType"));
   $('input[name="option"][value="' + getTaskType() + '"]').prop(
+    "checked",
+    true,
+  );
+  $('input[name="utility-option"][value="' + getTaskType() + '"]').prop(
     "checked",
     true,
   );
@@ -2186,6 +2322,199 @@ function submitResult(id, videoId, textAnswer = null, isAsync = false) {
   }).responseText;
 }
 
+const KIS_SUBMIT_BASE_URL = "http://192.168.28.151:5000/api/v2/submit/";
+
+function openSubmitSettings() {
+  if (!document.getElementById("submitSettingsModal")) {
+    const sessionId = prompt("KIS session ID", localStorage.getItem("kisSessionId") || "");
+    if (sessionId === null) return;
+    const evaluationId = prompt("KIS evaluation ID", localStorage.getItem("kisEvaluationId") || "");
+    if (evaluationId === null) return;
+    localStorage.setItem("kisSessionId", sessionId.trim());
+    localStorage.setItem("kisEvaluationId", evaluationId.trim());
+    return;
+  }
+  $("#submitSessionId").val(localStorage.getItem("kisSessionId") || "");
+  $("#submitEvaluationId").val(localStorage.getItem("kisEvaluationId") || "");
+  $("#submitSettingsModal").prop("hidden", false);
+}
+
+function closeSubmitSettings() {
+  $("#submitSettingsModal").prop("hidden", true);
+}
+
+function openUserInfo() {
+  const userName = String(config?.ui?.["user-name"] || "User").trim() || "User";
+  const userInfoName = document.getElementById("userInfoName");
+  if (userInfoName) userInfoName.textContent = userName;
+  $("#userInfoModal").prop("hidden", false);
+}
+
+function closeUserInfo() {
+  $("#userInfoModal").prop("hidden", true);
+}
+
+function saveSubmitSettings() {
+  localStorage.setItem("kisSessionId", $("#submitSessionId").val().trim());
+  localStorage.setItem("kisEvaluationId", $("#submitEvaluationId").val().trim());
+  closeSubmitSettings();
+}
+
+function getFrameIndexFromId(frameId) {
+  const match = String(frameId || "").match(/-(\d+)(?:\.[^.]+)?$/);
+  return match ? parseInt(match[1], 10) : NaN;
+}
+
+function getFrameTimestampMs(frameId, videoId) {
+  const frameIndex = getFrameIndexFromId(frameId);
+  let fps;
+  try {
+    fps = parseFloat(getFps(videoId));
+  } catch (error) {
+    throw new Error("Cannot load FPS for " + videoId + ": " + error.message);
+  }
+  if (!isFinite(frameIndex) || !isFinite(fps) || fps <= 0) {
+    throw new Error("Cannot calculate timestamp for frame " + frameId);
+  }
+  return Math.round((frameIndex / fps) * 1000);
+}
+
+function submitKISFrame(frameId, videoId) {
+  const sessionId = localStorage.getItem("kisSessionId") || "";
+  const evaluationId = localStorage.getItem("kisEvaluationId") || "";
+
+  if (!sessionId || !evaluationId) {
+    alert("Please configure session ID and evaluation ID first.");
+    openSubmitSettings();
+    return Promise.reject(new Error("Missing KIS submit settings"));
+  }
+  try {
+    const timestampMs = getFrameTimestampMs(frameId, videoId);
+    return submitKISValues(videoId, timestampMs, timestampMs, sessionId, evaluationId);
+  } catch (error) {
+    return Promise.reject(error);
+  }
+}
+
+function submitKISValues(videoId, startMs, endMs, sessionId, evaluationId) {
+  sessionId = sessionId || localStorage.getItem("kisSessionId") || "";
+  evaluationId = evaluationId || localStorage.getItem("kisEvaluationId") || "";
+  const payload = {
+    answerSets: [{ answers: [{ mediaItemName: videoId, start: startMs, end: endMs }] }],
+  };
+  const url = KIS_SUBMIT_BASE_URL + encodeURIComponent(evaluationId);
+
+  return fetch(url + "?session=" + encodeURIComponent(sessionId), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  }).then(async function (response) {
+    const text = await response.text();
+    const serverResponse = formatDresServerResponse(response, text);
+    if (!response.ok) throw new Error(serverResponse);
+    return serverResponse;
+  });
+}
+
+function formatDresServerResponse(response, body) {
+  const statusText = response.statusText ? " " + response.statusText : "";
+  return "HTTP " + response.status + statusText + "\n\n" + (body || "(DRES returned an empty response)");
+}
+
+function submitQAFrame(frameId, videoId) {
+  const sessionId = localStorage.getItem("kisSessionId") || "";
+  const evaluationId = localStorage.getItem("kisEvaluationId") || "";
+  if (!sessionId || !evaluationId) {
+    alert("Please configure session ID and evaluation ID first.");
+    openSubmitSettings();
+    return Promise.reject(new Error("Missing QA submit settings"));
+  }
+  let timestampMs;
+  try {
+    timestampMs = getFrameTimestampMs(frameId, videoId);
+  } catch (error) {
+    return Promise.reject(error);
+  }
+
+  return askQAAnswer(videoId, timestampMs).then(function (answer) {
+    const text = answer + "-" + videoId + "-" + timestampMs;
+    const payload = {
+      answerSets: [{ answers: [{ text: text }] }],
+    };
+    const url = KIS_SUBMIT_BASE_URL + encodeURIComponent(evaluationId);
+    return fetch(url + "?session=" + encodeURIComponent(sessionId), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }).then(async function (response) {
+      const responseText = await response.text();
+      const serverResponse = formatDresServerResponse(response, responseText);
+      if (!response.ok) throw new Error(serverResponse);
+      return serverResponse;
+    });
+  });
+}
+
+function askQAAnswer(videoId, timestampMs) {
+  return new Promise(function (resolve, reject) {
+    let modal = document.getElementById("qaAnswerModal");
+    if (!modal) {
+      modal = document.createElement("div");
+      modal.id = "qaAnswerModal";
+      modal.className = "submit-settings-modal kis-submit-confirm-modal";
+      modal.innerHTML = '<div class="submit-settings-card kis-submit-confirm-card qa-answer-card">' +
+        '<div class="submit-settings-header"><span>QA answer</span><button type="button" class="submit-settings-close" data-qa-cancel>&times;</button></div>' +
+        '<div class="qa-answer-context">' + videoId + ' &middot; ' + timestampMs + ' ms</div>' +
+        '<label>Answer<textarea id="qaAnswerInput" rows="4" placeholder="Type your answer..."></textarea></label>' +
+        '<div class="submit-settings-actions"><button type="button" data-qa-cancel>Cancel</button><button type="button" class="submit-settings-save" data-qa-submit>Submit</button></div>' +
+        '</div>';
+      document.body.appendChild(modal);
+    } else {
+      $(modal).find(".qa-answer-context").text(videoId + " · " + timestampMs + " ms");
+    }
+    $("#qaAnswerInput").val("").trigger("focus");
+    $(modal).prop("hidden", false);
+    $(modal).off("click.qaAnswer").on("click.qaAnswer", function (event) {
+      if (event.target === modal || $(event.target).is("[data-qa-cancel]")) {
+        $(modal).prop("hidden", true);
+        const cancelled = new Error("QA submission cancelled");
+        cancelled.cancelled = true;
+        reject(cancelled);
+      } else if ($(event.target).is("[data-qa-submit]")) {
+        const answer = $("#qaAnswerInput").val().trim();
+        if (!answer) {
+          alert("Please enter an answer.");
+          return;
+        }
+        $(modal).prop("hidden", true);
+        resolve(answer);
+      }
+    });
+  });
+}
+
+function showKISServerResponse(title, message, isError) {
+  let modal = document.getElementById("kisServerResponseModal");
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.id = "kisServerResponseModal";
+    modal.className = "submit-settings-modal kis-submit-confirm-modal";
+    modal.innerHTML = '<div class="submit-settings-card kis-submit-confirm-card">' +
+      '<div class="submit-settings-header"><span id="kisServerResponseTitle"></span><button type="button" class="submit-settings-close" data-kis-response-close>&times;</button></div>' +
+      '<pre id="kisServerResponseBody" class="kis-server-response-body"></pre>' +
+      '<div class="submit-settings-actions"><button type="button" class="submit-settings-save" data-kis-response-close>Close</button></div>' +
+      '</div>';
+    document.body.appendChild(modal);
+    $(modal).on("click.kisResponse", function (event) {
+      if (event.target === modal || $(event.target).is("[data-kis-response-close]")) $(modal).prop("hidden", true);
+    });
+  }
+  $("#kisServerResponseTitle").text(title);
+  $("#kisServerResponseTitle").css("color", isError ? "#a41318" : "#198754");
+  $("#kisServerResponseBody").text(message || "(empty response)");
+  $(modal).prop("hidden", false);
+}
+
 function submitAtTime(videoId, time) {
   return $.ajax({
     type: "GET",
@@ -2205,10 +2534,32 @@ function submitVersion2(selectedItem) {
   $("#submitted_bar").css("display", "block");
   let res = null;
   if (localStorage.getItem("taskType") === "qa") {
-    submitQA();
+    showKISServerResponse("Submitting to DRES", "Waiting for the DRES server response...", false);
+    submitQAFrame(selectedItem.imgId, selectedItem.videoId)
+      .then(function (response) {
+        showKISServerResponse("DRES server response", response, false);
+      })
+      .catch(function (error) {
+        if (error.cancelled) {
+          $("#kisServerResponseModal").prop("hidden", true);
+          return;
+        }
+        console.error("QA submit failed:", error);
+        showKISServerResponse("DRES submission failed", error.message, true);
+      });
   } else {
     if (submitAlert()) {
-      if (localStorage.getItem("taskType") === "avs")
+      if (localStorage.getItem("taskType") === "kis") {
+        showKISServerResponse("Submitting to DRES", "Waiting for the DRES server response...", false);
+        submitKISFrame(selectedItem.imgId, selectedItem.videoId)
+          .then(function (response) {
+            showKISServerResponse("DRES server response", response, false);
+          })
+          .catch(function (error) {
+            console.error("KIS submit failed:", error);
+            showKISServerResponse("DRES submission failed", error.message, true);
+          });
+      } else if (localStorage.getItem("taskType") === "avs")
         submitResult(
           selectedItem.imgId,
           selectedItem.videoId,
@@ -2273,23 +2624,26 @@ function hideOverlay(img_overlay) {
   document.getElementById(img_overlay).style.opacity = 0;
 }
 
-const imgResult = (res, borderColor, img_loading = "eager") => {
+const imgResult = (
+  res,
+  borderColor,
+  imgLoading = "lazy",
+  imgFetchPriority = "auto",
+) => {
   jsonString = JSON.stringify(res);
   return `
 		<div class="result-border" style="border-color: ${borderColor};">
-			<div class="myimg-thumbnail"  id="${res.imgId}" lang="${res.videoId}|${res.videoUrlPreview}" >
-				<img loading="${img_loading}" id="img${res.imgId}" class="myimg"  src="${res.thumb}" onclick='avsToggle(${jsonString}, event)' />
+			<div class="myimg-thumbnail" id="${res.imgId}" lang="${res.videoId}|${res.videoUrlPreview}" data-img-id="${res.imgId}">
+				<img loading="${imgLoading}" fetchpriority="${imgFetchPriority}" decoding="async" id="img${res.imgId}" class="myimg" src="${res.thumb}" onclick='avsToggle(${jsonString}, event)' />
 			</div>
-			<div  id="toolbar_icons_${res.imgId}">
-				<a class="font-tiny" title="View annotations of ${res.frameName},  Score: ${res.score}" href="indexedData.html?videoId=${res.videoId}&id=${res.imgId}" target="_blank"> ${res.frameNumber}</a>
-				<a title="Video summary" href="javascript:void(0);" onclick="openChildWindow('${res.videoId}', '${res.imgId}', '${res.frameName}')"><i class="fa fa-th font-normal" style="padding-left: 3px;"></i></a>
-				<a href="#" title="Play Video"><i title="Play Video" class="fa fa-play font-normal" style="color:#007bff;padding-left: 3px;" onclick="playVideoWindow('${res.videoUrl}', '${res.videoId}', '${res.imgId}'); return false;"></i></a>
-				<a href="#" class="isSimplified" title="image similarity"><img loading="${img_loading}" style="padding: 2px;" src="img/comboSim.svg" width=20 title="image similarity" alt="${res.imgId}" id="comboSim${res.imgId}" onclick="var queryObj=new Object(); queryObj.comboVisualSim='${res.imgId}'; searchByLink(queryObj); return false;"></a>
-				<a href="#" class="isAdvanced" title="Visual similarity"><img loading="${img_loading}" style="padding: 2px;" src="img/imgSim.png" width=20 title="Visual similarity (dinov2)" alt="${res.imgId}" id="gemSim${res.imgId}" onclick="var queryObj=new Object(); queryObj.vf='${res.imgId}'; searchByLink(queryObj); return false;"></a>
-				<a href="#" class="isAdvanced" title="semantic similarity""><img loading="${img_loading}" style="padding: 2px;" src="img/aladinSim.svg" width=20 title="semantic similarity" alt="${res.imgId}" id="aladinSim${res.imgId}" onclick="var queryObj=new Object(); queryObj.aladinSim='${res.imgId}'; searchByLink(queryObj); return false;"></a>
-
-				<a href="#" title="Submit result"><span class="pull-right"><i id="submitBTN_${res.imgId}" title="Submit result" class="fa fa-arrow-alt-circle-up font-huge" style="color:#00AA00; padding-left: 0px;" onclick='submitVersion2(${jsonString});'> </i></span></a>
-			<div>
+			<div id="toolbar_icons_${res.imgId}" class="result-toolbar">
+				<a class="result-frame-id" title="View annotations of ${res.frameName}, Score: ${res.score}" href="indexedData.html?videoId=${res.videoId}&id=${res.imgId}" target="_blank" onclick='markResultLightboxItemAsViewed(${jsonString})'>${res.frameNumber}</a>
+				<a class="result-action result-action-summary" title="Nearly keyframes" aria-label="Nearly keyframes" href="#" onclick='openNearbyKeyframes(${jsonString}); return false;'><i class="fas fa-th-large" aria-hidden="true"></i></a>
+				<a class="result-action result-action-play" href="#" title="Play video" aria-label="Play video" onclick="playVideoWindow('${res.videoUrl}', '${res.videoId}', '${res.imgId}'); return false;"><i class="fas fa-play" aria-hidden="true"></i></a>
+				<a class="result-action result-action-similarity isSimplified" href="#" title="Image similarity" aria-label="Image similarity" onclick="var queryObj=new Object(); queryObj.comboVisualSim='${res.imgId}'; searchByLink(queryObj); return false;"><i id="comboSim${res.imgId}" class="fas fa-clone" aria-hidden="true"></i></a>
+				<a class="result-action result-action-similarity isAdvanced" href="#" title="Visual similarity (DINOv2)" aria-label="Visual similarity (DINOv2)" onclick="var queryObj=new Object(); queryObj.vf='${res.imgId}'; searchByLink(queryObj); return false;"><i id="gemSim${res.imgId}" class="fas fa-clone" aria-hidden="true"></i></a>
+				<a id="submitBTN_${res.imgId}" class="result-action result-action-submit" href="#" title="Submit result" aria-label="Submit result" onclick='submitVersion2(${jsonString}); return false;'><i class="fas fa-paper-plane" aria-hidden="true"></i></a>
+			</div>
 		</div>
 		`;
 };
@@ -2313,6 +2667,9 @@ function openChildWindow(videoId, imgId, frameName) {
 }
 
 function playVideoWindow(videoURL, videoId, imgId) {
+  if (typeof markResultLightboxItemAsViewed === "function") {
+    markResultLightboxItemAsViewed({ imgId: imgId });
+  }
   let params = `scrollbars=no,status=no,location=no,toolbar=no,menubar=no,width=680,height=640,left=50,top=50`;
   var time = getStartTime(imgId);
   var myWindow = window.open(
@@ -2689,6 +3046,9 @@ function toggleSidebar() {
 
 function initLayout() {
   isAdvanced = true;
+  // The sidebar is always visible; its former collapse control is replaced by
+  // the fixed utility bar at the top of the page.
+  localStorage.setItem("sidebarCollapsed", "0");
   document.body.classList.add("advanced-mode");
   applySidebarLayout();
   $("#visionelogo").addClass("visioneLogo sidebar-brand");
@@ -3220,6 +3580,7 @@ async function init() {
   initLayout();
   displayAdvanced();
   initObjectIconsPanel();
+  initResultDragScroll();
 
   var script = document.createElement("script");
   script.src = "js/WebAudioRecorder/WebAudioRecorder.min.js";
@@ -3275,8 +3636,11 @@ function loadingNextResults() {
       resultsElement.scrollTop() + resultsElement.innerHeight() >=
         scrollableHeight - 200
     ) {
-      // Carica il prossimo batch di immagini
-      var nextBatchEndIndex = Math.min(visibleImages + batchSize, res.length);
+      // Load the next ranked video groups only when the user nears the bottom.
+      var nextBatchEndIndex = getVideoBatchEndIndex(
+        visibleImages,
+        videoBatchSize,
+      );
       loadImages(visibleImages, nextBatchEndIndex);
     }
   }
@@ -3328,6 +3692,90 @@ function initObjectIconsPanel() {
   });
 }
 
+function initResultDragScroll() {
+  const root = document.getElementById("imgGridResults");
+  if (!root || root.dataset.dragScrollBound === "true") return;
+  root.dataset.dragScrollBound = "true";
+
+  let dragState = null;
+  let suppressClickScroller = null;
+  let suppressClickTimer = null;
+  const interactiveSelector = "a, button, input, textarea, select, [role='button']";
+
+  root.addEventListener("dragstart", function (event) {
+    if (event.target.closest(".video-frames-scroll img")) event.preventDefault();
+  });
+
+  root.addEventListener("pointerdown", function (event) {
+    if (event.pointerType !== "mouse" || event.button !== 0) return;
+
+    const scroller = event.target.closest(".video-frames-scroll");
+    if (!scroller || event.target.closest(interactiveSelector)) return;
+
+    dragState = {
+      pointerId: event.pointerId,
+      scroller: scroller,
+      startX: event.clientX,
+      startScrollLeft: scroller.scrollLeft,
+      moved: false,
+    };
+  });
+
+  root.addEventListener("pointermove", function (event) {
+    if (!dragState || event.pointerId !== dragState.pointerId) return;
+
+    const deltaX = event.clientX - dragState.startX;
+    if (!dragState.moved) {
+      if (Math.abs(deltaX) < 5) return;
+      dragState.moved = true;
+      dragState.scroller.setPointerCapture(event.pointerId);
+      dragState.scroller.classList.add("is-dragging");
+    }
+    dragState.scroller.scrollLeft = dragState.startScrollLeft - deltaX;
+    event.preventDefault();
+  });
+
+  function finishDrag(event, cancelled) {
+    if (!dragState || event.pointerId !== dragState.pointerId) return;
+
+    const state = dragState;
+    dragState = null;
+    state.scroller.classList.remove("is-dragging");
+    if (state.scroller.hasPointerCapture(event.pointerId)) {
+      state.scroller.releasePointerCapture(event.pointerId);
+    }
+
+    if (state.moved && !cancelled) {
+      suppressClickScroller = state.scroller;
+      clearTimeout(suppressClickTimer);
+      suppressClickTimer = setTimeout(function () {
+        suppressClickScroller = null;
+      }, 0);
+    }
+  }
+
+  root.addEventListener("pointerup", function (event) {
+    finishDrag(event, false);
+  });
+
+  root.addEventListener("pointercancel", function (event) {
+    finishDrag(event, true);
+  });
+
+  root.addEventListener(
+    "click",
+    function (event) {
+      const scroller = event.target.closest(".video-frames-scroll");
+      if (!suppressClickScroller || scroller !== suppressClickScroller) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      suppressClickScroller = null;
+      clearTimeout(suppressClickTimer);
+    },
+    true,
+  );
+}
+
 function loadPalette() {
   let palette = config?.ui?.objects?.palette || [];
   let dataArray = [];
@@ -3367,6 +3815,7 @@ function initVideoTypeAndK() {
     });
     select.value = "all";
     videoType = "all";
+    initVideoTypeDropdown(select);
   }
 
   const kDefault = config?.ui?.k ?? 1000;
@@ -3379,6 +3828,52 @@ function initVideoTypeAndK() {
     slider.value = kDefault;
   }
   setTopK(kDefault, false);
+}
+
+function initVideoTypeDropdown(select) {
+  const dropdown = document.getElementById("videoTypeDropdown");
+  const selected = document.getElementById("videoTypeSelected");
+  const options = document.getElementById("videoTypeOptions");
+  if (!dropdown || !selected || !options) return;
+
+  const syncSelectedLabel = function () {
+    const activeOption = select.options[select.selectedIndex];
+    selected.textContent = activeOption ? activeOption.textContent : "all";
+    Array.from(options.children).forEach(function (item) {
+      const isSelected = item.dataset.value === select.value;
+      item.classList.toggle("is-selected", isSelected);
+      item.setAttribute("aria-selected", String(isSelected));
+    });
+  };
+
+  options.replaceChildren();
+  Array.from(select.options).forEach(function (option) {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "modern-video-option";
+    item.textContent = option.textContent;
+    item.dataset.value = option.value;
+    item.setAttribute("role", "option");
+    item.addEventListener("click", function () {
+      select.value = option.value;
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+      syncSelectedLabel();
+      dropdown.open = false;
+    });
+    options.appendChild(item);
+  });
+
+  select.addEventListener("change", syncSelectedLabel);
+  syncSelectedLabel();
+
+  if (!dropdown.dataset.outsideCloseBound) {
+    document.addEventListener("pointerdown", function (event) {
+      if (!dropdown.contains(event.target)) dropdown.open = false;
+      const utilityFilter = document.querySelector(".utility-filter");
+      if (utilityFilter && !utilityFilter.contains(event.target)) utilityFilter.open = false;
+    });
+    dropdown.dataset.outsideCloseBound = "true";
+  }
 }
 
 async function checkServices() {

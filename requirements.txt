@@ -6,7 +6,8 @@ fastapi
 torch
 pydantic
 uvicorn
-gzip
+flask
+aiohttp
 torchvision
 tqdm
 transformers==5.4.0
@@ -15,3 +16,5 @@ requests
 elasticsearch==9.1.0
 deep-translator==1.11.4
 google-genai==2.14.0
+deepl
+google-cloud-translate==3.27.0

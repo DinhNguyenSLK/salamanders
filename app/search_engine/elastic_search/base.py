@@ -3,8 +3,12 @@ from elasticsearch import AsyncElasticsearch, NotFoundError
 from schemas import SearchResult, SearchParams
 from typing import Any
 from search_engine.query_parser import QueryObj
+from math import isfinite
 
 class BaseElasticSearchTemplate(ABC):
+
+    MATCHED_TERMS_SCORE_FIELDS = frozenset({"ocr", "asr"})
+    DEFAULT_MATCHED_TERMS_LAMBDA = 1.0
 
     def __init__(
             self,
@@ -14,17 +18,56 @@ class BaseElasticSearchTemplate(ABC):
         self.es_client = es_client
         self.index_name = index_name
 
+    def _apply_matched_terms_score(
+            self,
+            query_body: dict[str, Any],
+            matched_terms_lambda: float | None = None,
+    ) -> dict[str, Any]:
+        """Return BM25 + lambda * number of matched query terms."""
+
+        lambda_value = (
+            self.DEFAULT_MATCHED_TERMS_LAMBDA
+            if matched_terms_lambda is None
+            else float(matched_terms_lambda)
+        )
+
+        if not isfinite(lambda_value) or lambda_value < 0:
+            raise ValueError("matched_terms_lambda must be a finite non-negative number")
+
+        if lambda_value == 0:
+            return query_body
+        print('SCRIPT SCORE')
+        
+        return {
+            "script_score": {
+                "query": query_body,
+                "script": {
+                    "lang": "painless",
+                    "source": (
+                        "_score + params.matched_terms_lambda * "
+                        "_termStats.matchedTermsCount()"
+                    ),
+                    "params": {
+                        "matched_terms_lambda": lambda_value,
+                    },
+                },
+            }
+        }
+
     async def search(
             self,
             query_dict: dict[str, Any],
             top_k: int = 1000,
+            
             **extra_params: Any
     ) -> list[SearchResult]:
 
         query_body = self._build_query(query_dict, **extra_params)
         full_body = self._apply_common_options(query_body, top_k)
         response = await self._execute_query(full_body)
-        return self._format_response(response)
+        results = self._format_response(response)
+
+        return results
     
     
     @abstractmethod

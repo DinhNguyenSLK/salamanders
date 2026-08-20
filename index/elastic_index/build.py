@@ -101,7 +101,7 @@ def main():
                 elastic_index.add_documents(documents)
                 print(f"Added {len(documents)} documents for video {video_id}")
         else:
-            print(f"Document file {doc_file} does not exist. Skipping.")
+            print(f"Document file th{doc_file} does not exist. Skipping.")
 
 if __name__ == "__main__":
     main()

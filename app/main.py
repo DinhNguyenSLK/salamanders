@@ -13,7 +13,7 @@ from routes import search, media, get_field, rewrite, generate_image
 async def lifespan(app: FastAPI):
     # Startup: Chạy khi khởi động app
     ElasticSearchClientSingleton.get_client()
-
+    
     yield
 
     # Shutdown: Chạy khi tắt app

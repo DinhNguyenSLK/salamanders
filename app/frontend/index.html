@@ -2,6 +2,9 @@
 <html>
   <head>
     <meta charset="UTF-8" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <meta name="task" content="KIS" />
     <meta name="dataset" content="v3c" />
 
@@ -9,16 +12,97 @@
     <link rel="stylesheet" href="css/jquery-ui.min.css" />
     <link rel="stylesheet" href="css/fontawesome.min.css" />
     <link rel="stylesheet" href="css/bootstrap.css" />
-    <link rel="stylesheet" href="css/visione.css?v=12" />
-    <link rel="stylesheet" href="css/queryByExample.css?v=4" />
+    <link rel="stylesheet" href="css/visione.css?v=89" />
+    <link rel="stylesheet" href="css/queryByExample.css?v=11" />
     <link rel="stylesheet" href="css/toggle.css" />
   </head>
 
   <body class="advanced-mode" oncontextmenu="return false;">
+    <div id="utilityBar" class="utility-bar" role="toolbar" aria-label="Utility bar">
+      <button type="button" class="utility-brand" aria-label="Reload Salamanders" title="Reload page" onclick="window.location.reload();">
+        <span class="utility-brand-mark" aria-hidden="true"><img src="favicon.ico" alt="" /></span>
+        <span class="utility-brand-name">SALAMANDERS</span>
+      </button>
+      <div id="searchLatency" class="utility-latency" title="Search round-trip time: frontend request to backend response" aria-live="polite">
+        <span class="utility-latency-label">Latency</span>
+        <span id="searchLatencyValue" class="utility-latency-value">--</span>
+      </div>
+      <div class="utility-task" aria-label="Task">
+        <span class="utility-task-label">Task</span>
+        <label class="utility-radio-label">
+          <input type="radio" name="utility-option" value="kis" onclick="setTaskType('kis')" />
+          KIS (Known-Item Search)
+        </label>
+        <label class="utility-radio-label">
+          <input type="radio" name="utility-option" value="qa" onclick="setTaskType('qa')" />
+          Q&amp;A (Visual Question Answering)
+        </label>
+      </div>
+      <div id="utilityActions" class="utility-actions" aria-label="Additional utilities">
+        <details class="utility-filter">
+          <summary class="utility-filter-btn" title="Search filters" aria-label="Search filters">
+            <i class="fa fa-filter" aria-hidden="true"></i>
+          </summary>
+          <div class="utility-search-controls" aria-label="Search options">
+            <div class="video-type-control">
+              <span class="ctrl-label">Video type</span>
+              <details id="videoTypeDropdown" class="modern-video-select">
+                <summary>
+                  <span id="videoTypeSelected">all</span>
+                  <i class="fa fa-chevron-down" aria-hidden="true"></i>
+                </summary>
+                <div id="videoTypeOptions" class="modern-video-options" role="listbox" aria-label="Video type"></div>
+              </details>
+              <select id="videoTypeSelect" onchange="setVideoType(this.value)" hidden></select>
+            </div>
+            <div class="k-slider-control">
+              <label for="kSlider" class="ctrl-label">
+                <span>Top K</span>
+                <span id="kValue" class="filter-value-badge">1000</span>
+              </label>
+              <div class="filter-range-row">
+                <span>100</span>
+                <input id="kSlider" type="range" min="100" max="10000" step="100" value="1000" oninput="setTopK(this.value, false)" />
+                <span>10,000</span>
+              </div>
+            </div>
+          </div>
+        </details>
+        <button type="button" class="utility-user-btn" onclick="openUserInfo()" title="User information" aria-label="User information">
+          <i class="fa fa-user" aria-hidden="true"></i>
+        </button>
+        <button type="button" class="utility-settings-btn" onclick="openSubmitSettings()" title="Submit settings" aria-label="Submit settings">
+          <i class="fa fa-cog" aria-hidden="true"></i>
+        </button>
+      </div>
+    </div>
+    <div id="submitSettingsModal" class="submit-settings-modal" hidden role="dialog" aria-modal="true" aria-labelledby="submitSettingsTitle">
+      <div class="submit-settings-card">
+        <div class="submit-settings-header">
+          <span id="submitSettingsTitle">Submit settings</span>
+          <button type="button" class="submit-settings-close" onclick="closeSubmitSettings()" aria-label="Close">&times;</button>
+        </div>
+        <label>Session ID<input id="submitSessionId" type="text" autocomplete="off"></label>
+        <label>Evaluation ID<input id="submitEvaluationId" type="text" autocomplete="off"></label>
+        <div class="submit-settings-actions">
+          <button type="button" onclick="closeSubmitSettings()">Cancel</button>
+          <button type="button" class="submit-settings-save" onclick="saveSubmitSettings()">Save</button>
+        </div>
+      </div>
+    </div>
+    <div id="userInfoModal" class="submit-settings-modal" hidden role="dialog" aria-modal="true" aria-labelledby="userInfoTitle">
+      <div class="submit-settings-card user-info-card">
+        <div class="submit-settings-header">
+          <span id="userInfoTitle">User information</span>
+          <button type="button" class="submit-settings-close" onclick="closeUserInfo()" aria-label="Close">&times;</button>
+        </div>
+        <div class="user-info-name"><i class="fa fa-user" aria-hidden="true"></i><span id="userInfoName"></span></div>
+      </div>
+    </div>
     <div id="content" class="containerGrid">
       <div class="bodyGrid">
         <div class="sidebarGrid" id="searchSidebar">
-          <button
+          <button style="display: none !important"
             type="button"
             id="sidebarToggle"
             class="sidebar-toggle"
@@ -30,80 +114,8 @@
             <i class="fa fa-chevron-left" aria-hidden="true"></i>
           </button>
           <div class="sidebar-inner">
-            <div class="sidebar-header">
-              <div class="task_bounding-box">
-                <div class="top-line"></div>
-                <span class="task-text">Task</span>
-                <label class="radio-label">
-                  <input
-                    type="radio"
-                    name="option"
-                    value="kis"
-                    onclick="setTaskType('kis')"
-                  />
-                  KIS
-                </label>
-                <label class="radio-label">
-                  <input
-                    type="radio"
-                    name="option"
-                    value="avs"
-                    onclick="setTaskType('avs')"
-                  />
-                  AVS
-                </label>
-                <label class="radio-label">
-                  <input
-                    type="radio"
-                    name="option"
-                    value="qa"
-                    onclick="setTaskType('qa')"
-                  />
-                  Q&A
-                </label>
-              </div>
-
-              <div class="sidebar-header-controls">
-                <div class="video-type-control">
-                  <label for="videoTypeSelect" class="ctrl-label"
-                    >Video type</label
-                  >
-                  <select
-                    id="videoTypeSelect"
-                    onchange="setVideoType(this.value)"
-                  ></select>
-                </div>
-
-                <div class="k-slider-control">
-                  <label for="kSlider" class="ctrl-label"
-                    >K = <span id="kValue">1000</span></label
-                  >
-                  <input
-                    id="kSlider"
-                    type="range"
-                    min="100"
-                    max="10000"
-                    step="100"
-                    value="1000"
-                    oninput="setTopK(this.value, false)"
-                  />
-                </div>
-              </div>
-
-              <div id="visionelogo" class="sidebar-brand">
-                <a href=""
-                  ><img
-                    id="visionelogoImg"
-                    src="img/logoVISIONE.png"
-                    alt=""
-                    title="Restart"
-                    onclick="startNewKISSession()"
-                /></a>
-              </div>
-
-              <div id="dialog" title="Tag Name" style="display: none">
-                <label>tag</label> <input id="tag" name="tag" type="text" />
-              </div>
+            <div id="dialog" title="Tag Name" style="display: none">
+              <label>tag</label> <input id="tag" name="tag" type="text" />
             </div>
 
             <div class="sidebar-fixed">
@@ -131,9 +143,14 @@
               <div id="searchTab"></div>
               <div
                 id="qbe"
-                w3-include-html="filters.html"
+                w3-include-html="filters.html?v=9"
                 class="font-normal"
               ></div>
+            </div>
+            <div class="qbe-search-fixed">
+              <button type="button" id="queryByExample" class="qbe-search-btn" title="Search" onclick="queryImg(); return false;">
+                <i class="fa fa-search"></i> Search
+              </button>
             </div>
           </div>
         </div>
@@ -153,10 +170,11 @@
           </div>
         </div>
         <div class="rightSidebarGrid" id="submitted_bar" style="display: none">
-          <div style="color: green">
-            Submitted: <b id="submitted_num" style="color: red"></b>
+          <div class="submitted-header">
+            <span class="submitted-title">Submitted</span>
+            <b id="submitted_num" class="submitted-count"></b>
           </div>
-          <div id="avsSubmittedTab"></div>
+          <div id="avsSubmittedTab" class="submitted-list"></div>
         </div>
       </div>
     </div>
@@ -198,15 +216,117 @@
       </div>
     </div>
 
+    <div
+      id="nearbyKeyframesModal"
+      class="nearby-keyframes-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="nearbyKeyframesTitle"
+      hidden
+    >
+      <div class="nearby-keyframes-backdrop" data-nearby-keyframes-close></div>
+      <div class="nearby-keyframes-dialog">
+        <div class="nearby-keyframes-header">
+          <div>
+            <div class="nearby-keyframes-eyebrow">Nearly Keyframes</div>
+            <div id="nearbyKeyframesTitle" class="nearby-keyframes-title"></div>
+          </div>
+          <div class="nearby-keyframes-controls" aria-label="Load adjacent keyframes">
+            <button type="button" id="nearbyKeyframesPrevious" class="nearby-keyframes-load" title="Load earlier keyframes">
+              <i class="fas fa-chevron-left" aria-hidden="true"></i>
+              <span>Earlier</span>
+            </button>
+            <span id="nearbyKeyframesRange" class="nearby-keyframes-range" aria-live="polite"></span>
+            <button type="button" id="nearbyKeyframesNext" class="nearby-keyframes-load" title="Load later keyframes">
+              <span>Later</span>
+              <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            </button>
+            <button type="button" class="nearby-keyframes-close" title="Close" aria-label="Close" data-nearby-keyframes-close>
+              <i class="fas fa-times" aria-hidden="true"></i>
+            </button>
+          </div>
+        </div>
+        <div id="nearbyKeyframesScroller" class="nearby-keyframes-scroller">
+          <div id="nearbyKeyframesGrid" class="nearby-keyframes-grid" aria-label="Adjacent keyframes"></div>
+        </div>
+        <div id="nearbyKeyframePreview" class="nearby-keyframe-preview" role="dialog" aria-modal="true" aria-label="Keyframe preview" hidden>
+          <button type="button" class="nearby-keyframe-preview-close" title="Close preview" aria-label="Close preview" data-nearby-preview-close>
+            <i class="fas fa-times" aria-hidden="true"></i>
+          </button>
+          <img id="nearbyKeyframePreviewImage" alt="" />
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="resultLightbox"
+      class="result-lightbox"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="resultLightboxTitle"
+      hidden
+    >
+      <div class="result-lightbox-backdrop" data-result-lightbox-close></div>
+      <div class="result-lightbox-dialog">
+        <div class="result-lightbox-header">
+          <div id="resultLightboxTitle" class="result-lightbox-title"></div>
+          <div class="result-lightbox-actions" aria-label="Preview actions">
+            <button type="button" class="result-lightbox-action" title="Nearly keyframes" aria-label="Nearly keyframes" data-result-lightbox-action="summary">
+              <i class="fas fa-th-large" aria-hidden="true"></i>
+            </button>
+            <button type="button" class="result-lightbox-action result-lightbox-action-play" title="Play video" aria-label="Play video" data-result-lightbox-action="play">
+              <i class="fas fa-play" aria-hidden="true"></i>
+            </button>
+            <button type="button" class="result-lightbox-action result-lightbox-action-similarity" title="Visual similarity" aria-label="Visual similarity" data-result-lightbox-action="similarity">
+              <i class="fas fa-clone" aria-hidden="true"></i>
+            </button>
+            <button type="button" class="result-lightbox-action result-lightbox-action-submit" title="Submit result" aria-label="Submit result" data-result-lightbox-action="submit">
+              <i class="fas fa-paper-plane" aria-hidden="true"></i>
+            </button>
+          </div>
+        </div>
+        <div class="result-lightbox-stage">
+          <img id="resultLightboxImage" alt="Selected result preview" />
+        </div>
+        <div class="result-lightbox-thumbnail-rail">
+          <button
+            type="button"
+            id="resultLightboxPrevious"
+            class="result-lightbox-page result-lightbox-page-previous"
+            title="Previous thumbnails"
+            aria-label="Previous thumbnails"
+            data-result-lightbox-page="-1"
+          >
+            <i class="fas fa-chevron-left" aria-hidden="true"></i>
+          </button>
+          <div
+            id="resultLightboxThumbnails"
+            class="result-lightbox-thumbnails"
+            aria-label="Adjacent keyframes"
+          ></div>
+          <button
+            type="button"
+            id="resultLightboxNext"
+            class="result-lightbox-page result-lightbox-page-next"
+            title="Next thumbnails"
+            aria-label="Next thumbnails"
+            data-result-lightbox-page="1"
+          >
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
     <script src="js/jquery-3.3.1.min.js"></script>
     <script src="js/jquery-ui.min.js"></script>
     <script src="js/fabric.js"></script>
     <script src="js/js-yaml.min.js"></script>
-    <script src="js/queryByExample.js?v=4"></script>
-    <script src="js/visione.js?v=15"></script>
-    <script src="js/visioneAVS.js"></script>
+    <script src="js/queryByExample.js?v=5"></script>
+    <script src="js/visione.js?v=40"></script>
+    <script src="js/visioneAVS.js?v=13"></script>
     <script src="js/canvas.js?v=5"></script>
-    <script src="js/search_bar_templates.js?v=11"></script>
+    <script src="js/search_bar_templates.js?v=17"></script>
     <script>
       init().catch(function (err) {
         console.error("init failed:", err);
@@ -237,6 +357,18 @@
 
         unifiedSubmit(avsObj, null);
       });
+
+	  const visualSimilarityChannel = new BroadcastChannel("visione-visual-similarity");
+	  visualSimilarityChannel.addEventListener("message", (event) => {
+		const message = event.data;
+		if (!message || message.type !== "visual-similarity") return;
+
+		const frameId = String(message.frameId || "").trim();
+		if (!frameId) return;
+
+		searchByLink({ vf: frameId });
+		window.focus();
+	  });
     </script>
   </body>
 </html>

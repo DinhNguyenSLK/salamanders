@@ -1,4 +1,5 @@
 from schemas import SearchParams, QueryItems, ParamItems
+from unidecode import unidecode
 
 class QueryObj:
     def __init__(
@@ -9,6 +10,7 @@ class QueryObj:
     ):   
         self.query = query
         self.parameter = parameter
+
         self.query_dict = query.model_dump()
         self.parameter_dict = parameter.model_dump()
 
@@ -44,13 +46,15 @@ class QueryObj:
     def parseOcr(self):
         return {
             "field": "ocr",
-            "value": self.query.ocr
+            "fuzziness": self.parameter.ocr_fuzziness,
+            "value": unidecode(self.query.ocr.lower().strip())
         }
 
     def parseAsr(self):
         return {
             "field": "asr",
-            "value": self.query.asr
+            "fuzziness": self.parameter.asr_fuzziness,
+            "value": unidecode(self.query.asr.lower().strip())
         }
 
     def parseTags(self):
