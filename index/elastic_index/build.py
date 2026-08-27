@@ -5,6 +5,7 @@ import argparse
 import gzip
 import json
 from tqdm import tqdm
+from typing import Dict, Any
 
 class ElasticIndex:
 
@@ -36,25 +37,86 @@ class ElasticIndex:
             print("Index does not exist. No action taken.")
     
     def add_document(self, document):
+        # add single document
         doc_id = document.get("imgID")
-        
         if self.es.exists(index=self.index_name, id=doc_id) and not self.force:
             print(f"Doc id {doc_id} already exists, SKIP")
             return
         self.es.index(index=self.index_name, id=doc_id, body=document)
 
     def add_documents(self, documents):
-            
+        # bulk API, _op_type = index will overwrite if _id existed, = create will no change if _id existed
+
+        op_type = "index" if self.force else "create"
+
+        actions = []
+
         for document in documents:
-            self.add_document(document)
+            doc_id = document['imgID']
 
-    def update_document(self, document):
+            actions.append(
+                {
+                    "_op_type": op_type,
+                    "_index": self.index_name,
+                    "_id": doc_id,
+                    "_source": document
+                }
+            )
+
+        success, failed = bulk(
+            self.es,
+            actions,
+            chunk_size=1000, 
+            raise_on_error = False
+        )
+
+        print(
+                f"Success: {success}, "
+                f"Failed: {len(failed)}"
+            )
+
         
+    def update_documents(self, documents: Dict[str, Any], updated_fields: list):
+        
+        actions = []
+
         
 
+        for document in documents:
+            doc_id = document["imgID"]
 
+            actions.append(
+                {
+                    "_op_type" : "update",
+                    "_index" : self.index_name,
+                    "_id" : doc_id,
+                    "doc" : 
+                    {
+                        field: document[field] for field in updated_fields
+                    }
+                }
+            )
 
-def main_create():
+        success, failed = bulk(
+                    self.es,
+                    actions,
+                    chunk_size=1000, 
+                    raise_on_error = False
+                )
+        
+        print(
+                f"Success: {success}, "
+                f"Failed: {len(failed)}"
+            )
+
+def read_gzip(file: Path):
+
+    with gzip.open(file, 'rt', encoding="utf-8") as f:
+        data = [json.loads(line) for line in f]
+
+    return data
+
+def create():
 
     ES_HOST = "http://localhost:9200"
     INDEX_NAME = "salamanders"
@@ -103,17 +165,46 @@ def main_create():
         doc_file = video_dir / f'{video_id}-elastic-docs.jsonl.gz'
 
         if doc_file.exists():
-            with gzip.open(doc_file, 'rt', encoding='utf-8') as f:
-                documents = [json.loads(line) for line in f]
-                elastic_index.add_documents(documents)
-                print(f"Added {len(documents)} documents for video {video_id}")
+            documents = read_gzip(doc_file)
+            elastic_index.add_documents(documents)
+            print(f"Added {len(documents)} documents for video {video_id}")
+        else:
+            print(f"Document file th{doc_file} does not exist. Skipping.")
+            return
+
+def update():
+    # Change in here
+    updated_field = [
+        "ocr", "asr", "shot_id"
+    ]
+
+
+
+    ES_HOST = "http://localhost:9200"
+    INDEX_NAME = "salamanders"
+
+    elastic_index = ElasticIndex(ES_HOST, INDEX_NAME)
+
+    INPUT_DIR = Path("./collection_dir/elastic-documents")
+    
+    video_dirs = sorted([d for d in INPUT_DIR.iterdir() if d.is_dir()])
+
+    for video_dir in tqdm(video_dirs, desc="Processing video directories", unit="video"):
+        print(f"Processing video directory: {video_dir}")
+        video_id = video_dir.stem
+        doc_file = video_dir / f'{video_id}-elastic-docs.jsonl.gz'
+
+        if doc_file.exists():
+            documents = read_gzip(doc_file)
+            elastic_index.update_documents(documents)
+            print(f"Update {len(documents)} documents for video {video_id}")
         else:
             print(f"Document file th{doc_file} does not exist. Skipping.")
             return
 
 if __name__ == "__main__":
-    main_create()
-
+    update()
+    
     # python -m index.elastic_index.build
 
     
