@@ -102,8 +102,8 @@ class ElasticIndex:
                     self.es,
                     actions,
                     chunk_size=1000, 
-                    raise_on_error = False
-                )
+                    raise_on_error = False,
+                                   )
         
         print(
                 f"Success: {success}, "
