@@ -174,7 +174,7 @@ def create():
 
 def update():
     # Change in here
-    updated_field = [
+    updated_fields = [
         "ocr", "asr", "shot_id"
     ]
 
@@ -196,7 +196,7 @@ def update():
 
         if doc_file.exists():
             documents = read_gzip(doc_file)
-            elastic_index.update_documents(documents)
+            elastic_index.update_documents(documents, updated_fields)
             print(f"Update {len(documents)} documents for video {video_id}")
         else:
             print(f"Document file th{doc_file} does not exist. Skipping.")
