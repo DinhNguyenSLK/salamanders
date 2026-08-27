@@ -39,3 +39,5 @@ services/
 
 add_title.py
 check_len_asr.py
+
+./app/api/google-translate.json

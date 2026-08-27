@@ -1,4 +1,5 @@
 from elasticsearch import Elasticsearch
+from elasticsearch.helpers import bulk
 from pathlib import Path
 import argparse
 import gzip
@@ -43,11 +44,17 @@ class ElasticIndex:
         self.es.index(index=self.index_name, id=doc_id, body=document)
 
     def add_documents(self, documents):
-
+            
         for document in documents:
             self.add_document(document)
-    
-def main():
+
+    def update_document(self, document):
+        
+        
+
+
+
+def main_create():
 
     ES_HOST = "http://localhost:9200"
     INDEX_NAME = "salamanders"
@@ -60,7 +67,7 @@ def main():
             "collection": {"type": "keyword", "index": False},
             "title": {"type": "text", "analyzer": "whitespace", "index": False},
             "published_date": {"type": "keyword", "index": False},
-
+            "shot_id": {"type": "keyword", "index": False},
             "startframe": {"type": "integer", "index": False},
             "endframe": {"type": "integer", "index": False},
             "middleframe": {"type": "integer", "index": False},
@@ -102,9 +109,10 @@ def main():
                 print(f"Added {len(documents)} documents for video {video_id}")
         else:
             print(f"Document file th{doc_file} does not exist. Skipping.")
+            return
 
 if __name__ == "__main__":
-    main()
+    main_create()
 
     # python -m index.elastic_index.build
 

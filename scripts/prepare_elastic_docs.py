@@ -33,11 +33,19 @@ class PrepareElasticDocs:
             start_seconds = row.start_seconds
             end_seconds = row.end_seconds
             content = row.content
+
+            new_content = []
+            for word in content.split():
+                word = word.strip(" .,!()-")
+                new_content.append(word)
+            new_content = " ".join(new_content)
+
             asr_list.append({
                 "start_seconds": start_seconds,
                 "end_seconds": end_seconds,
-                "content": unidecode(content.lower().strip())
+                "content": unidecode(new_content.lower().strip())
             })
+
         return asr_list
     
     def find_asr_content(self, asr_data, selected_time):
@@ -154,6 +162,7 @@ class PrepareElasticDocs:
         # --------------------------------------------------
         # Xử lý scene đã chọn
         # --------------------------------------------------
+        shot_id = int(matched_scene['shot_id'])
 
         start_fr = int(matched_scene['start_frame'])
         end_fr = int(matched_scene['end_frame'])
@@ -171,7 +180,7 @@ class PrepareElasticDocs:
 
             "title": title,
             "published_date": published_date,
-
+            "shot_id": shot_id,
             "startframe": start_fr,
             "endframe": end_fr,
             "middleframe": middle_fr,
