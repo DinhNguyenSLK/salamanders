@@ -11,6 +11,7 @@
 	<link rel="stylesheet" href="css/fontawesome.min.css">
 	<link rel="stylesheet" href="css/bootstrap.css">
 	<link rel="stylesheet" href="css/visione.css?v=25">
+	<link rel="stylesheet" href="css/customSubmission.css?v=1">
 	<style>
 		/* Override main UI lock — this page needs normal document scroll */
 		html.page-keyframes,
@@ -292,6 +293,7 @@
 	<script src="js/jquery-ui.min.js"></script>
 	<script src="js/js-yaml.min.js"></script>
 	<script src="js/visione.js?v=24"></script>
+	<script src="js/customSubmission.js?v=1"></script>
 </head>
 
 <body class="page-keyframes">
@@ -320,7 +322,27 @@
 			return localStorage.getItem('taskType') === 'qa';
 		}
 
+		function submitFromMainWindow(imgId, videoId) {
+			try {
+				if (window.opener && !window.opener.closed && typeof window.opener.submitVersion2 === 'function') {
+					window.opener.submitVersion2({ imgId: imgId, videoId: videoId });
+					window.opener.focus();
+					return true;
+				}
+			} catch (error) {
+				console.warn('Unable to submit through the search window:', error);
+			}
+			return false;
+		}
+
 		function submit(imgId, videoId) {
+			if (localStorage.getItem('submissionType') === 'CUSTOM') {
+				submitVersion2({ imgId: imgId, videoId: videoId });
+				return;
+			}
+
+			if (submitFromMainWindow(imgId, videoId)) return;
+
 			if (checkQA()) {
 				submitQAFrame(imgId, videoId).then(function (response) {
 					showKISServerResponse('QA submit response', response, false);

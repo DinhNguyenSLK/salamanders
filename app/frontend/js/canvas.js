@@ -111,9 +111,11 @@ function get_canvas(idx) {
 			activeCanvas.remove(rect);
 			if (rect.width >= cellWidth/3 && rect.height >= cellHeight/3) {
 				$("#dialog").dialog("open");
-				$("#tag").autocomplete({
-				      source: null
-				 });
+				$("#tag").autocomplete(
+					"option",
+					"appendTo",
+					$("#dialog").parent()
+				);
 			} else
 				return;
 
@@ -227,31 +229,31 @@ function get_canvas(idx) {
 			 }
 		});
 
-		$("#dialog").off();
-		$("#dialog").keyup(function(e) {
-			textVal = $("#tag").val().trim();
-			if (textVal.length >= 2) {
-				$( "#tag" ).autocomplete({
-			        minLength: 2,
-			        source: function( request, response ) {
-			          response( $.ui.autocomplete.filter(
-			        	availableTags, extractLast( request.term ) ) );
-			        },
-			        focus: function() {
-			          return false;
-			        },
-			        select: function( event, ui ) {
-			          var terms = split( this.value );
-			          terms.pop();
-			          terms.push( ui.item.value.split(',')[0] );
-			          terms.push( "" );
-			          this.value = terms.join( " " );
-			          return false;
-			        }
-			      });
-			} else {
-				$( "#tag" ).autocomplete( "option", "source", '' );
+		$("#tag").autocomplete({
+			minLength: 2,
+			appendTo: $("#dialog").parent(),
+			source: function(request, response) {
+				var tags = Array.isArray(availableTags) ? availableTags : [];
+				response(
+					$.ui.autocomplete.filter(tags, extractLast(request.term))
+				);
+			},
+			focus: function() {
+				return false;
+			},
+			select: function(event, ui) {
+				var terms = split(this.value);
+				terms.pop();
+				terms.push(ui.item.value.split(',')[0]);
+				terms.push("");
+				this.value = terms.join(" ");
+				return false;
 			}
+		});
+
+		$("#dialog").off("keyup.objectGrid");
+		$("#dialog").on("keyup.objectGrid", function(e) {
+			textVal = $("#tag").val().trim();
 			 var key = e.which;
 			 if(key == 13) {
 				if (textVal) {

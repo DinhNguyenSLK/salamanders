@@ -16,15 +16,17 @@
   const originalSubmitVersion2 = window.submitVersion2;
 
   let savedQueries = readSavedQueries();
-  let savedZipName = readSessionValue(ZIP_NAME_STORAGE_KEY);
+  let savedZipName = readStoredValue(ZIP_NAME_STORAGE_KEY);
   let draftQueries = [];
   let draftZipName = "";
   let zipIsLoading = false;
   let crc32Table = null;
 
-  function readSessionValue(key) {
+  if (savedQueries.length) persistSavedState();
+
+  function readStoredValue(key) {
     try {
-      return sessionStorage.getItem(key) || "";
+      return localStorage.getItem(key) || sessionStorage.getItem(key) || "";
     } catch (error) {
       return "";
     }
@@ -32,11 +34,29 @@
 
   function readSavedQueries() {
     try {
-      const parsed = JSON.parse(sessionStorage.getItem(QUERY_STORAGE_KEY) || "[]");
+      const serialized = localStorage.getItem(QUERY_STORAGE_KEY) ||
+        sessionStorage.getItem(QUERY_STORAGE_KEY) || "[]";
+      const parsed = JSON.parse(serialized);
       if (!Array.isArray(parsed)) return [];
       return parsed.filter(isValidQuery);
     } catch (error) {
       return [];
+    }
+  }
+
+  function persistSavedState() {
+    const serializedQueries = JSON.stringify(savedQueries);
+    try {
+      sessionStorage.setItem(QUERY_STORAGE_KEY, serializedQueries);
+      sessionStorage.setItem(ZIP_NAME_STORAGE_KEY, savedZipName);
+    } catch (error) {
+      console.warn("Cannot persist CUSTOM queries in this tab:", error);
+    }
+    try {
+      localStorage.setItem(QUERY_STORAGE_KEY, serializedQueries);
+      localStorage.setItem(ZIP_NAME_STORAGE_KEY, savedZipName);
+    } catch (error) {
+      console.warn("Cannot persist CUSTOM queries for cross-tab use:", error);
     }
   }
 
@@ -160,12 +180,7 @@
 
     savedQueries = draftQueries.slice();
     savedZipName = draftZipName;
-    try {
-      sessionStorage.setItem(QUERY_STORAGE_KEY, JSON.stringify(savedQueries));
-      sessionStorage.setItem(ZIP_NAME_STORAGE_KEY, savedZipName);
-    } catch (error) {
-      console.warn("Cannot persist CUSTOM queries in session storage:", error);
-    }
+    persistSavedState();
     localStorage.setItem(TYPE_STORAGE_KEY, CUSTOM_TYPE);
     window.closeSubmitSettings();
   };
@@ -518,6 +533,8 @@
         target_url: runtimeConfig.endpoint,
         api_key: runtimeConfig.apiKey,
         payload: payload,
+        video_id: selectedItem.videoId,
+        frame_id: selectedItem.imgId,
       }),
     });
     const responseText = await response.text();

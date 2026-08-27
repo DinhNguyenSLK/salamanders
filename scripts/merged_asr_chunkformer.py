@@ -1,20 +1,15 @@
 import csv
-import re
 from pathlib import Path
 from tqdm import tqdm
 
-def get_first_letter(text):
-    m = re.search(r'[A-Za-zÀ-ỹĐđ]', text)
-    return m.group(0) if m else ''
+forbidden_L25 = ["SIU", "Để có được thành công như hôm nay", "tôi đã có những ước mơ", "và tôi đã hiện thực hóa ước mơ của mình", "Trường Đại học Quốc tế Sài Gòn", "S.I.U",
+"tạo đa dạng, đa lĩnh vực", "cơ hội lựa chọn nghề nghiệp", "sinh viên đều có cơ hội", "tôi đã được truyền cảm hứng", "môi trường lý tưởng", "triết lý giáo dục mà ",
+"lúc vương xa hơn những gì", "Quốc tế Á", "giữ gìn bản sắc và những giá trị", "Trường Quốc tế Á Châu", "bằng giữa học thuật và nghệ thuật",
+"rõ mục đích giáo dục không chỉ", "Học bổng", "SIU,", "S.I.U.", "viết nên câu chuyện tương lai", "không phải là chuẩn bị cho cuộc sống", "Á Châu", "phản biện các vấn đề để", "đây với tôi còn hơn cả một", "giúp chúng tôi đặt những viên gạch đầu tiên"
 
-def get_first_word(text):
-    m = re.search(r"[A-Za-zÀ-ỹĐđ]+", text)
-    return m.group(0) if m else ""
+                 ]
 
-MAX_WORDS = 100
-MAX_SECONDS = 45
-
-def merge_segments_greedy(path, viet_dict, hard=False):
+def merge_segments_greedy(path, threshold):
     with open(path, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
 
@@ -34,39 +29,14 @@ def merge_segments_greedy(path, viet_dict, hard=False):
         prev_text = rows[t - 1][2]
         curr_text = rows[t][2]
 
+        # if any(fb in curr_text or fb in prev_text for fb in forbidden_L25):
+        #     continue
+
         if not prev_text or not curr_text:
             continue
 
-        first_char = get_first_letter(curr_text)
-        first_word = get_first_word(curr_text)
-
-        last_char = prev_text.rstrip()[-1]
-
-        # Có dấu kết thúc + bắt đầu bằng chữ hoa
-        # => xem như sang câu mới
-        if first_char.isupper() and last_char in ".!?…":
-            continue
-
-        if hard and first_char.isupper() and first_word.lower() in viet_dict:
-            continue
-
-        merged_text = prev_text + " " + curr_text
-
-        merged_words = len(merged_text.split())
-
-        merged_duration = (
-            float(rows[t][1]) -
-            float(rows[t-1][0])
-        )
-
-        if (
-            (first_char.islower() and last_char not in ".!?…")
-            or
-            (
-                merged_words <= MAX_WORDS
-                and merged_duration <= MAX_SECONDS
-            )
-        ):
+        if  (float(rows[t][0]) - float(rows[t-1][1]) <= threshold) and len(prev_text) + len(curr_text) <= 500 :
+    
 
              # Merge
             rows[t][0] = rows[t - 1][0]                      # start_seconds
@@ -95,13 +65,8 @@ def save_csv(rows, output_path):
             writer.writerow(row)
 
 if __name__ == "__main__":
-    with open('./collection_dir/all-vietnamese-syllables.txt', 'r', encoding='utf-8') as f:
-        data = f.readlines()
-        data = [i.strip("\n") for i in data]
-        
-        viet_dict = set(data)
 
-    ASR_INPUT_DIR = Path("./collection_dir/asr/L25")
+    ASR_INPUT_DIR = Path("./collection_dir/asr_chunkformer/L26")
     ASR_OUT_DIR = Path("./collection_dir/semantic-asr")
 
     if not ASR_OUT_DIR.exists():
@@ -113,12 +78,12 @@ if __name__ == "__main__":
         
         file_name = file.name
         output_path = ASR_OUT_DIR / file_name
-        rows = merge_segments_greedy(file, viet_dict)
+        rows = merge_segments_greedy(file, 0.5)
 
         save_csv(rows, output_path)
 
 
-    # python -m scripts.merged_asr
+    # python -m scripts.merged_asr_chunkformer
     
 
         

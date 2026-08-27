@@ -1,6 +1,9 @@
 from flask import Flask, send_from_directory
+from pathlib import Path
 
 app = Flask(__name__)
+
+VIDEO_ROOT = Path(__file__).resolve().parents[1] / 'collection_dir' / 'videos'
 
 @app.route('/thumbnails/<path:filepath>')
 def getThumbnail(filepath):
@@ -13,7 +16,9 @@ def getKeyframes(filepath):
 
 @app.route('/medium_video/<path:filepath>')
 def getMediumVideo(filepath):
-    return send_from_directory('G:/salamanders/collection_dir/resized-videos/medium/', filepath)
+    video_filename = Path(filepath).name
+    prefix_video_id = Path(video_filename).stem.split('_', 1)[0]
+    return send_from_directory(VIDEO_ROOT / prefix_video_id, video_filename)
 
 
 @app.route('/tiny_video/<path:filepath>')

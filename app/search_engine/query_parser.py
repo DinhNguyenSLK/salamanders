@@ -47,6 +47,7 @@ class QueryObj:
         return {
             "field": "ocr",
             "fuzziness": self.parameter.ocr_fuzziness,
+            "operator": self.parameter.ocr_operator,
             "value": unidecode(self.query.ocr.lower().strip())
         }
 
@@ -54,6 +55,7 @@ class QueryObj:
         return {
             "field": "asr",
             "fuzziness": self.parameter.asr_fuzziness,
+            "operator": self.parameter.asr_operator,
             "value": unidecode(self.query.asr.lower().strip())
         }
 

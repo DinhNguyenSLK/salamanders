@@ -22,11 +22,15 @@ class ParamItems(BaseModel):
     textual_model: Literal["metaclip2", "siglip2", "align"] = "siglip2"
     operator: Literal["or", "and"] = "and"
     range: Literal["lt", "gt", "eq"] = "eq"
+
     asr_mode: Literal["text", "vector"] = "text"
     ocr_mode: Literal["text", "vector"] = "text"
+    
     asr_fuzziness: str | int = 0
     ocr_fuzziness: str | int = 0
 
+    asr_operator: Literal["and", "or"] = "or"
+    ocr_operator: Literal["and", "or"] = "or"
     
 class SearchParams(BaseModel):
     query: list[QueryItems]

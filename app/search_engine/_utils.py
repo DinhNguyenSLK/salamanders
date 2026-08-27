@@ -14,63 +14,139 @@ def _filter(results: list[SearchResult], pre_filter_results: set):
 
     return [result for result in results if result.imgId in pre_filter_results]
 
-def _temporal(all_results):
+def _temporal(all_results: list[list[SearchResult]]) -> list[SearchResult]:
     """
     Ghép kết quả nhiều scene theo thứ tự thời gian trong cùng video.
 
-    - 1 scene: trả về nguyên.
-    - N scene: chỉ giữ video xuất hiện ở mọi scene, với selectedFrame tăng dần.
-      Score đại diện = trung bình score các frame đã chọn; trả về frame scene đầu.
+    Với mỗi video xuất hiện ở tất cả scene, dynamic programming chọn chuỗi
+    ``selectedFrame`` tăng nghiêm ngặt có tổng score lớn nhất. Mỗi video hợp lệ
+    trả về đúng một frame cho mỗi temporal query, theo thứ tự scene.
     """
     if not all_results:
         return []
-    if len(all_results)==1:
+    if len(all_results) == 1:
         return all_results[0]
 
-    by_video_per_tab = []
-    video_sets = []
+    by_video_per_scene: list[dict[str, list[SearchResult]]] = []
+    video_sets: list[set[str]] = []
     for results in all_results:
-        by_v = defaultdict(list)
-        for r in results:
-            by_v[r.videoId].append(r)
-        by_video_per_tab.append(by_v)
-        video_sets.append(set(by_v.keys()))
+        by_video: dict[str, list[SearchResult]] = defaultdict(list)
+        for result in results:
+            by_video[result.videoId].append(result)
+        by_video_per_scene.append(by_video)
+        video_sets.append(set(by_video))
 
-    common = set.intersection(*video_sets) if video_sets else set()
-    if not common:
-        return all_results[0]
+    common_videos = set.intersection(*video_sets) if video_sets else set()
+    if not common_videos:
+        return []
 
-    output: list[SearchResult] = []
-    for video_id in common:
-        last_frame = -1
-        chosen_frames = []
-        ok = True
-        for by_v in by_video_per_tab:
-            # Ưu tiên frame sau last_frame, score cao hơn
-            candidates = sorted(
-                by_v[video_id],
-                key=lambda x: (x.selectedFrame <= last_frame, -x.score, x.selectedFrame),
+    scene_count = len(all_results)
+    ranked_sequences: list[tuple[float, str, list[SearchResult]]] = []
+
+    for video_id in common_videos:
+        layers = [
+            sorted(
+                by_video[video_id],
+                key=lambda result: (
+                    result.selectedFrame,
+                    -result.score,
+                    result.imgId,
+                ),
             )
-            picked = None
-            for c in candidates:
-                if c.selectedFrame > last_frame:
-                    picked = c
-                    break
-            if picked is None:
-                ok = False
-                break
-            chosen_frames.append(picked)
-            last_frame = picked.selectedFrame
+            for by_video in by_video_per_scene
+        ]
 
-        if not ok or not chosen_frames:
+        # dp_scores[j]: tổng score tốt nhất của chuỗi kết thúc tại candidate j.
+        dp_scores = [float(result.score) for result in layers[0]]
+        parents: list[list[int]] = [[-1] * len(layers[0])]
+        has_complete_path = True
+
+        for scene_index in range(1, scene_count):
+            previous_layer = layers[scene_index - 1]
+            current_layer = layers[scene_index]
+            current_scores = [float("-inf")] * len(current_layer)
+            current_parents = [-1] * len(current_layer)
+
+            # Hai layer đã sort theo frame. Prefix maximum giúp chuyển trạng
+            # thái DP trong O(len(previous_layer) + len(current_layer)).
+            previous_index = 0
+            best_previous_index = -1
+            for current_index, current_result in enumerate(current_layer):
+                while (
+                    previous_index < len(previous_layer)
+                    and previous_layer[previous_index].selectedFrame
+                    < current_result.selectedFrame
+                ):
+                    if dp_scores[previous_index] != float("-inf"):
+                        if best_previous_index == -1:
+                            best_previous_index = previous_index
+                        else:
+                            candidate_key = (
+                                dp_scores[previous_index],
+                                -previous_layer[previous_index].selectedFrame,
+                                previous_layer[previous_index].imgId,
+                            )
+                            best_key = (
+                                dp_scores[best_previous_index],
+                                -previous_layer[best_previous_index].selectedFrame,
+                                previous_layer[best_previous_index].imgId,
+                            )
+                            if candidate_key > best_key:
+                                best_previous_index = previous_index
+                    previous_index += 1
+
+                if best_previous_index != -1:
+                    current_scores[current_index] = (
+                        dp_scores[best_previous_index]
+                        + float(current_result.score)
+                    )
+                    current_parents[current_index] = best_previous_index
+
+            if all(score == float("-inf") for score in current_scores):
+                has_complete_path = False
+                break
+
+            dp_scores = current_scores
+            parents.append(current_parents)
+
+        if not has_complete_path:
             continue
 
-        avg_score = sum(f.score for f in chosen_frames) / len(chosen_frames)
-        rep = chosen_frames[0].model_copy(update={"score": float(avg_score)})
-        output.append(rep)
+        reachable_endpoints = [
+            index
+            for index, score in enumerate(dp_scores)
+            if score != float("-inf")
+        ]
+        end_index = min(
+            reachable_endpoints,
+            key=lambda index: (
+                -dp_scores[index],
+                layers[-1][index].selectedFrame,
+                layers[-1][index].imgId,
+            ),
+        )
+        total_score = dp_scores[end_index]
 
-    output.sort(key=lambda x: x.score, reverse=True)
-    return output
+        chosen_frames: list[SearchResult] = [layers[0][0]] * scene_count
+        candidate_index = end_index
+        for scene_index in range(scene_count - 1, -1, -1):
+            chosen_frames[scene_index] = layers[scene_index][candidate_index]
+            if scene_index > 0:
+                candidate_index = parents[scene_index][candidate_index]
+
+        average_score = float(total_score / scene_count)
+        scored_sequence = [
+            frame.model_copy(update={"score": average_score})
+            for frame in chosen_frames
+        ]
+        ranked_sequences.append((average_score, video_id, scored_sequence))
+
+    ranked_sequences.sort(key=lambda item: (-item[0], item[1]))
+    return [
+        frame
+        for _, _, sequence in ranked_sequences
+        for frame in sequence
+    ]
 
 
 def _merge(tab_results: dict[str, list[SearchResult]]) -> list[SearchResult]:

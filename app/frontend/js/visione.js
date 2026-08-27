@@ -1007,8 +1007,15 @@ function extractprev(term) {
 }
 
 $.get("objects_doc_freq.csv", function (data) {
-  availableTags = data.split("\n");
-  //availableTags = [];
+  availableTags = data
+    .split(/\r?\n/)
+    .map(function (tag) {
+      return tag.trim();
+    })
+    .filter(Boolean);
+}).fail(function (_xhr, status, error) {
+  availableTags = [];
+  console.error("Unable to load object suggestions:", status, error);
 });
 
 draggedLabel = "";
@@ -1352,6 +1359,10 @@ function cell2Text(idx) {
   let queryParameters = {
     textual_model: textualMode[idx] || "all",
     operator: occur[idx] || "and",
+    ocr_operator:
+      $("#ocrOperator" + idx).attr("data-operator") || "or",
+    asr_operator:
+      $("#asrOperator" + idx).attr("data-operator") || "or",
   };
 
   let textual = "";
@@ -2097,7 +2108,7 @@ function loadImages(startIndex, endIndex) {
         videoId +
         "&id=" +
         imgId +
-        '" target="_blank" onclick="markTopVideoResultAsViewed(this)">' +
+        '" target="_blank" rel="opener" onclick="markTopVideoResultAsViewed(this)">' +
         videoId +
         "</a></div>" +
         '<div class="video-frames-scroll" data-videoid="' +

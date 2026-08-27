@@ -51,7 +51,7 @@ class MatchQueryTemplate(BaseElasticSearchTemplate):
         )
         return self._apply_matched_terms_score(
             match_query,
-            matched_terms_lambda=5,
+            matched_terms_lambda=matched_terms_lambda,
         )
     
 class ShouldTermQueryTemplate(BaseElasticSearchTemplate):

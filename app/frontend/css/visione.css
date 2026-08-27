@@ -2498,6 +2498,49 @@ textarea.textualquery1,
   width: 100%;
 }
 
+.field-operator-toggle {
+  -webkit-appearance: none;
+  appearance: none;
+  align-items: center;
+  background: #fffaf0;
+  border: 1px solid #c99438;
+  border-radius: 5px;
+  box-sizing: border-box;
+  color: #8f5b25;
+  cursor: pointer;
+  display: inline-flex;
+  flex: none;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  height: 26px;
+  justify-content: center;
+  line-height: 1;
+  min-width: 38px;
+  padding: 0 8px;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.field-operator-toggle:hover {
+  background: #f8ead0;
+  border-color: #aa6a20;
+}
+
+.field-operator-toggle:focus-visible {
+  border-color: #aa6a20;
+  box-shadow: 0 0 0 2px rgba(201, 148, 56, 0.22);
+  outline: none;
+}
+
+.fuzziness-mode-row .fuzziness-picker select {
+  height: 26px;
+  line-height: 24px;
+}
+
+.fuzziness-mode-row .fuzziness-select-shell::after {
+  top: 9px;
+}
+
 .fuzziness-picker {
   align-items: center;
   color: var(--earth-muted);

@@ -15,6 +15,16 @@ function toggleFieldPanel(btn) {
   );
 }
 
+function toggleFieldOperator(btn) {
+  if (!btn) return;
+  const nextOperator = btn.dataset.operator === "and" ? "or" : "and";
+  const fieldName = (btn.dataset.field || "field").toUpperCase();
+  btn.dataset.operator = nextOperator;
+  btn.textContent = nextOperator.toUpperCase();
+  btn.setAttribute("aria-label", `${fieldName} operator: ${nextOperator.toUpperCase()}`);
+  btn.title = `${fieldName} operator: ${nextOperator.toUpperCase()}. Click to switch.`;
+}
+
 function orderScenePanels(canvasID) {
   const scene = document.getElementById(`canvasTab${canvasID}`);
   const fieldGroup = document.getElementById(`block${canvasID}`);
@@ -202,6 +212,9 @@ const searchForm = (
 							<input type="radio" name="ocrMode${canvasID}" value="vector">
 							<span>Vector</span>
 						</label>
+						<button type="button" id="ocrOperator${canvasID}" class="field-operator-toggle"
+							data-field="ocr" data-operator="or" aria-label="OCR operator: OR"
+							title="OCR operator: OR. Click to switch." onclick="toggleFieldOperator(this)">OR</button>
 						<label class="fuzziness-picker" for="ocrFuzziness${canvasID}" title="OCR fuzziness">
 							<span class="fuzziness-picker-label">Fuzzy</span>
 							<span class="fuzziness-select-shell">
@@ -234,6 +247,9 @@ const searchForm = (
 							<input type="radio" name="asrMode${canvasID}" value="vector">
 							<span>Vector</span>
 						</label>
+						<button type="button" id="asrOperator${canvasID}" class="field-operator-toggle"
+							data-field="asr" data-operator="or" aria-label="ASR operator: OR"
+							title="ASR operator: OR. Click to switch." onclick="toggleFieldOperator(this)">OR</button>
 						<label class="fuzziness-picker" for="asrFuzziness${canvasID}" title="ASR fuzziness">
 							<span class="fuzziness-picker-label">Fuzzy</span>
 							<span class="fuzziness-select-shell">
