@@ -197,8 +197,6 @@ class PrepareElasticDocs:
         record["ocr"] = (
             " ".join(ocr_data)
             .lower()
-            .replace(".", " ")
-            .replace(",", " ")
         )
 
         return record

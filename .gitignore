@@ -37,5 +37,5 @@ services/
 *.hdf5
 *.zip
 
-add_title.Python
+add_title.py
 check_len_asr.py
