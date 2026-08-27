@@ -36,8 +36,9 @@ services/
 *.txt
 *.hdf5
 *.zip
+*.json
 
 add_title.py
 check_len_asr.py
 
-./app/api/google-translate.json
+app/api/google-translate.json

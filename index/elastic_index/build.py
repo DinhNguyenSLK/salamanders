@@ -75,7 +75,8 @@ class ElasticIndex:
                 f"Failed: {len(failed)}"
             )
 
-        
+        return success, len(failed)
+    
     def update_documents(self, documents: Dict[str, Any], updated_fields: list):
         
         actions = []
@@ -109,6 +110,8 @@ class ElasticIndex:
                 f"Failed: {len(failed)}"
             )
 
+        return success, len(failed)
+    
 def read_gzip(file: Path):
 
     with gzip.open(file, 'rt', encoding="utf-8") as f:
@@ -151,6 +154,8 @@ def create():
                     }}, 
     }}
     
+    total_success = 0
+    total_failed = 0
 
     elastic_index = ElasticIndex(ES_HOST, INDEX_NAME, force=True)
     elastic_index.create_index(mappings=mappings)
@@ -166,11 +171,17 @@ def create():
 
         if doc_file.exists():
             documents = read_gzip(doc_file)
-            elastic_index.add_documents(documents)
+            suc, failed = elastic_index.add_documents(documents)
+
+            total_success += suc
+            total_failed += failed
+
             print(f"Added {len(documents)} documents for video {video_id}")
         else:
             print(f"Document file th{doc_file} does not exist. Skipping.")
             return
+    print(f'SUCCESS: {total_success}, FAILED: {total_failed}')
+
 
 def update():
     # Change in here
@@ -178,7 +189,8 @@ def update():
         "ocr", "asr", "shot_id"
     ]
 
-
+    total_success = 0
+    total_failed = 0
 
     ES_HOST = "http://localhost:9200"
     INDEX_NAME = "salamanders"
@@ -196,12 +208,17 @@ def update():
 
         if doc_file.exists():
             documents = read_gzip(doc_file)
-            elastic_index.update_documents(documents, updated_fields)
+            suc, failed = elastic_index.update_documents(documents, updated_fields)
+
+            total_success += suc
+            total_failed += failed
+            
             print(f"Update {len(documents)} documents for video {video_id}")
         else:
             print(f"Document file th{doc_file} does not exist. Skipping.")
             return
-
+        
+    print(f'SUCCESS: {total_success}, FAILED: {total_failed}')
 if __name__ == "__main__":
     update()
     

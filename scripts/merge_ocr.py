@@ -32,11 +32,19 @@ def merged_ocr(record_paddle: Dict, record_parseq: Dict):
     new_record_paddle = process_record_paddle(record_paddle)
     new_record_parseq = process_record_parseq(record_parseq)
 
+    paddle_ocr = new_record_paddle["ocr"]
+    parseq_ocr = new_record_parseq["ocr"]
+
+    paddle_words = set(paddle_ocr)
+
+    merged_ocr = paddle_ocr + [
+        word for word in parseq_ocr
+        if word not in paddle_words
+    ]
+
     merged_record = {
         "_id": record_parseq["_id"],
-        "ocr": list(dict.fromkeys(
-                        new_record_parseq['ocr'] + new_record_paddle['ocr']
-))
+        "ocr": merged_ocr
     }
 
     return merged_record
