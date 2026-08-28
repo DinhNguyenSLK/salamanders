@@ -2212,6 +2212,56 @@ textarea.textualquery1,
   color: #a41318;
 }
 
+.utility-rearrange {
+  align-items: center;
+  appearance: none;
+  background: #fff8ec;
+  border: 1px solid #ddc7a6;
+  border-radius: 8px;
+  color: var(--earth-muted);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 15px;
+  height: 36px;
+  justify-content: center;
+  left: 314px;
+  padding: 0;
+  position: absolute;
+  top: 7px;
+  transition: background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, color 0.16s ease, transform 0.16s ease;
+  width: 36px;
+}
+
+.utility-rearrange:hover {
+  background: #f5e5c8;
+  border-color: #caa571;
+  color: var(--earth-brown-dark);
+}
+
+.utility-rearrange:focus {
+  outline: none;
+}
+
+.utility-rearrange:focus-visible {
+  outline: 2px solid #d8ad63;
+  outline-offset: 2px;
+}
+
+.utility-rearrange:active {
+  transform: scale(0.94);
+}
+
+.utility-rearrange[aria-pressed="true"] {
+  background: #a86f08;
+  border-color: #edc66e;
+  box-shadow: 0 0 0 2px rgba(255, 210, 91, 0.48), 0 0 17px rgba(241, 174, 39, 0.92), inset 0 1px 0 rgba(255, 255, 255, 0.34);
+  color: #fffbea;
+}
+
+.utility-rearrange[aria-pressed="true"] i {
+  filter: drop-shadow(0 0 4px #fff1a6);
+}
+
 /* Compact top-right filter menu; it reuses the existing select and slider. */
 .utility-filter {
   position: relative;

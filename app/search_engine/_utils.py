@@ -184,6 +184,7 @@ def _merge(tab_results: dict[str, list[SearchResult]]) -> list[SearchResult]:
 def _slice(
     results: list[SearchResult],
     n_frames_per_round: int,
+    rearrange: bool
 ) -> list[SearchResult]:
     """
     Group theo videoId rồi interleave kết quả.
@@ -199,6 +200,7 @@ def _slice(
     groups: dict[str, list[SearchResult]] = defaultdict(list)
 
     for result in results:
+        
         groups[result.videoId].append(result)
 
     # Đảm bảo mỗi group giảm dần theo score
@@ -217,8 +219,30 @@ def _slice(
     
     for group in ordered_groups:
         take = min(n_frames_per_round, len(group))
-        if take > 0:
+
+        if not rearrange:
             output.extend(group[:take])
+            continue
+        else:
+            print("di vao day")
+            selected = []
+            distinct = set()
+            duplicated_list = []
+
+            for result in group:
+                if result.shotId not in distinct:
+                    distinct.add(result.shotId)
+                    selected.append(result)
+
+                    if len(selected) == take:
+                        break
+                else:
+                    duplicated_list.append(result)
+
+            if len(selected) < take:
+                selected.extend(duplicated_list[:take - len(selected)])
+
+            output.extend(selected)
 
     print(len(output))
     return output

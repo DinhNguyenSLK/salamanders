@@ -38,7 +38,8 @@ class SearchParams(BaseModel):
     video_type: Literal["all", "cycling", "news", "dance", "cooking", "lecture", "lifelog"] = "all"
     k: int = Field(default=1000, ge=100, le=10000, description="Top-k kết quả tốt nhất")
     n_frames_per_round: int = Field(default=10, ge=3, le=30, description="Số frame cho mỗi video id")
-
+    rearrange: bool = Field(default=False, description="Sắp xếp lại kết quả theo shot_id")
+    
     @model_validator(mode="after")
     def query_params_same_length(self) -> Self:
         if len(self.query) != len(self.parameters):

@@ -339,6 +339,7 @@ var occur = [];
 var textualMode = [];
 var videoType = "all";
 var topK = 1000;
+var rearrange = false;
 
 //var qbeUrl = ''
 var is43 = false;
@@ -1475,7 +1476,7 @@ function timestamp() {
 
 /**
  * SearchParams payload (schemas/_request.py):
- *   { query: QueryItems[], parameters: ParamItems[], video_type, k, n_frames_per_round }
+ *   { query: QueryItems[], parameters: ParamItems[], video_type, k, n_frames_per_round, rearrange }
  * query.length === parameters.length; mỗi phần tử = 1 temporal scene.
  */
 function buildSearchPayload(queryItems, paramItems) {
@@ -1485,7 +1486,14 @@ function buildSearchPayload(queryItems, paramItems) {
     video_type: videoType || "all",
     k: topK || 1000,
     n_frames_per_round: numResultsPerVideo || 10,
+    rearrange: Boolean(rearrange),
   };
+}
+
+function toggleRearrange() {
+  rearrange = !rearrange;
+  const button = document.getElementById("rearrangeToggle");
+  if (button) button.setAttribute("aria-pressed", String(rearrange));
 }
 
 /** Gom mọi scene temporal (có nội dung) thành 1 cặp query[] / parameters[]. */

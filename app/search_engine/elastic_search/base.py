@@ -132,12 +132,15 @@ class BaseElasticSearchTemplate(ABC):
                 except ValueError:
                     selected_frame = 0
 
+            shot_id = _source.get('shot_id')
+
             hits.append(
                 SearchResult(
                     score=float(score),
                     imgId=str(imgId),
                     videoId=str(video_id),
                     selectedFrame=int(selected_frame),
+                    shotId=int(shot_id)
                 )
             )
 

@@ -63,6 +63,8 @@ async def search(
     queries = QueryParser(params)
     k = queries.params.k
     n_frames_per_round = queries.params.n_frames_per_round
+    rearrange = queries.params.rearrange
+
     video_type_filter = await get_video_type_filter(
         es_client,
         index_name,
@@ -182,7 +184,7 @@ async def search(
 
     temporal_results = _temporal(all_results)
     
-    sliced_results = _slice(temporal_results, n_frames_per_round)
+    sliced_results = _slice(temporal_results, n_frames_per_round, rearrange)
     
     end_time = time.time()
 

@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="css/jquery-ui.min.css" />
     <link rel="stylesheet" href="css/fontawesome.min.css" />
     <link rel="stylesheet" href="css/bootstrap.css" />
-    <link rel="stylesheet" href="css/visione.css?v=92" />
+    <link rel="stylesheet" href="css/visione.css?v=94" />
     <link rel="stylesheet" href="css/customSubmission.css?v=1" />
     <link rel="stylesheet" href="css/queryByExample.css?v=11" />
     <link rel="stylesheet" href="css/toggle.css" />
@@ -28,6 +28,17 @@
         <span class="utility-latency-label">Latency</span>
         <span id="searchLatencyValue" class="utility-latency-value">--</span>
       </div>
+      <button
+        type="button"
+        id="rearrangeToggle"
+        class="utility-rearrange"
+        title="Rearrange results"
+        aria-label="Rearrange results"
+        aria-pressed="false"
+        onclick="toggleRearrange()"
+      >
+        <i class="fas fa-random" aria-hidden="true"></i>
+      </button>
       <div class="utility-task" aria-label="Task">
         <span class="utility-task-label">Task</span>
         <label class="utility-radio-label">
@@ -324,7 +335,7 @@
     <script src="js/fabric.js"></script>
     <script src="js/js-yaml.min.js"></script>
     <script src="js/queryByExample.js?v=5"></script>
-    <script src="js/visione.js?v=41"></script>
+    <script src="js/visione.js?v=42"></script>
     <script src="js/visioneAVS.js?v=13"></script>
     <script src="js/customSubmission.js?v=1"></script>
     <script src="js/canvas.js?v=6"></script>
