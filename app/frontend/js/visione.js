@@ -1461,13 +1461,17 @@ function timestamp() {
  * query.length === parameters.length; mỗi phần tử = 1 temporal scene.
  */
 function buildSearchPayload(queryItems, paramItems) {
-  return {
+  const payload = {
     query: queryItems,
     parameters: paramItems,
     video_type: videoType || "all",
     k: topK || 1000,
     n_frames_per_round: numResultsPerVideo || 10,
   };
+  const videoIdInput = document.getElementById("videoIdInput");
+  const videoId = videoIdInput ? videoIdInput.value.trim().toUpperCase() : "";
+  if (videoId) payload.video_id = videoId;
+  return payload;
 }
 
 /** Gom mọi scene temporal (có nội dung) thành 1 cặp query[] / parameters[]. */
@@ -1509,6 +1513,12 @@ function searchByForm() {
   const { queryItems, paramItems } = collectTemporalSearchItems();
   prevQuery = queryItems;
   if (queryItems.length === 0) {
+    const videoIdInput = document.getElementById("videoIdInput");
+    if (videoIdInput && videoIdInput.value.trim()) {
+      // With only a Video ID, return the indexed frames for that one video.
+      search2(buildSearchPayload([{}], [{}]));
+      return;
+    }
     search2(null);
     return;
   }
@@ -2408,6 +2418,7 @@ $(function () {
 });
 
 function getSubmissionImageUrl(selectedItem) {
+  if (selectedItem?.image_url) return selectedItem.image_url;
   if (selectedItem?.thumb) return selectedItem.thumb;
   if (selectedItem?.keyframe) return selectedItem.keyframe;
   if (selectedItem?.videoId && selectedItem?.imgId && keyFramesUrl) {
@@ -2427,7 +2438,7 @@ function submitExternalResult(selectedItem) {
     return Promise.reject(new Error("The selected result does not contain a valid video or frame ID."));
   }
   const imageUrl = getSubmissionImageUrl(selectedItem);
-  if (!imageUrl) {
+  if (!imageUrl && !selectedItem?.image_base64) {
     return Promise.reject(new Error("The selected result does not contain an image to submit."));
   }
   if (!urlVBSService) {
@@ -2439,8 +2450,10 @@ function submitExternalResult(selectedItem) {
     video_id: selectedItem.videoId,
     img_id: imgId,
     submitter: "external",
-    image_url: imageUrl,
   };
+  if (imageUrl) payload.image_url = imageUrl;
+  if (selectedItem?.image_base64) payload.image_base64 = selectedItem.image_base64;
+  if (selectedItem?.image_mime_type) payload.image_mime_type = selectedItem.image_mime_type;
 
   return fetchWithTimeout(
     urlVBSService.replace(/\/$/, "") + "/submission/external",
@@ -3476,6 +3489,15 @@ async function init() {
     document.title = config.main.collection_name + " - " + document.title;
   setNumResultsPerVideo();
   initVideoTypeAndK();
+  const videoIdInput = document.getElementById("videoIdInput");
+  if (videoIdInput) {
+    videoIdInput.addEventListener("keydown", function (event) {
+      if (event.key === "Enter" && !event.isComposing) {
+        event.preventDefault();
+        searchByForm();
+      }
+    });
+  }
   loadPalette();
   initSearchScenes();
 

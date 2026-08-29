@@ -14,6 +14,7 @@ router = APIRouter(
 )
 
 _video_type_cache: dict[str, set[str]] = {}
+_video_id_cache: dict[str, set[str]] = {}
 
 
 async def get_video_type_filter(es_client, index_name, video_type):
@@ -31,6 +32,22 @@ async def get_video_type_filter(es_client, index_name, video_type):
         )
 
     return _video_type_cache[video_type]
+
+
+async def get_video_id_filter(es_client, index_name, video_id):
+    """Filter exact results by the Elasticsearch videoID field."""
+    normalized_video_id = (video_id or "").strip().upper()
+    if not normalized_video_id:
+        return None
+
+    if normalized_video_id not in _video_id_cache:
+        _video_id_cache[normalized_video_id] = await _videotype_filter(
+            es_client,
+            index_name,
+            {"field": "videoID", "value": normalized_video_id},
+        )
+
+    return _video_id_cache[normalized_video_id]
 
 index_name = settings.ES_INDEX
 
@@ -50,6 +67,11 @@ async def search(
         index_name,
         queries.params.video_type,
     )
+    video_id_filter = await get_video_id_filter(
+        es_client,
+        index_name,
+        queries.params.video_id,
+    )
 
     if video_type_filter is not None:
         print(f"Len {queries.params.video_type} = {len(video_type_filter)}")
@@ -61,7 +83,11 @@ async def search(
         queryObj = queries.get(tab)
 
         # FILTER PART
-        filter_results = [video_type_filter] if video_type_filter else []
+        filter_results = [
+            result_filter
+            for result_filter in (video_type_filter, video_id_filter)
+            if result_filter is not None
+        ]
         
         if queryObj.get("object_count"):
             objcount_query = queryObj.parseObjCount()

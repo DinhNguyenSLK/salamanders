@@ -2335,6 +2335,10 @@ textarea.textualquery1,
   width: 100%;
 }
 
+.video-id-search-field input {
+  text-transform: uppercase;
+}
+
 /* Segmented task picker. Keeps the existing radio inputs and handlers intact. */
 .utility-task {
   background: #fff8ec;

@@ -29,6 +29,7 @@ class SearchParams(BaseModel):
     query: list[QueryItems]
     parameters: list[ParamItems]
     video_type: Literal["all", "cycling", "news", "cooking", "lecture"] = "all"
+    video_id: str | None = Field(default=None, min_length=1, max_length=255)
     k: int = Field(default=1000, ge=100, le=10000, description="Top-k kết quả tốt nhất")
     n_frames_per_round: int = Field(default=10, ge=3, le=30, description="Số frame cho mỗi video id")
 
@@ -50,6 +51,7 @@ class ExternalSubmission(BaseModel):
     submitter: Literal["external"] = "external"
     image_url: AnyHttpUrl | None = None
     image_base64: str | None = None
+    image_mime_type: str | None = None
 
 
 class ImageGeneration(BaseModel):

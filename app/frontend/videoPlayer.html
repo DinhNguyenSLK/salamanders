@@ -10,7 +10,7 @@
   <script src="https://vjs.zencdn.net/7.18.1/video.min.js"></script>
   <script src="js/jquery-3.3.1.min.js"></script>
   <script src="js/js-yaml.min.js"></script>
-  <script src="js/visione.js?v=46"></script>
+  <script src="js/visione.js?v=48"></script>
   <script src="js/videoYoutubeUrls.js?v=1"></script>
   <style>
     * { box-sizing: border-box; }
@@ -59,6 +59,17 @@
       font-size: 12px;
     }
     #actions { margin-top: 10px; }
+    #playbackRateControl {
+      align-items: center;
+      display: flex;
+      gap: 9px;
+      margin-top: 10px;
+      max-width: 640px;
+    }
+    #playbackRateControl label { color: #bbb; font-size: 13px; font-weight: bold; }
+    #playbackRateControl input { accent-color: #39a86b; cursor: pointer; flex: 1; }
+    #playbackRateControl .limit { color: #777; font-size: 12px; }
+    #playbackRateValue { color: #7dffa0; font-weight: bold; min-width: 32px; text-align: right; }
     #youtubeFallback {
       display: none;
       width: 640px;
@@ -182,6 +193,49 @@
       font-size: 14px;
     }
     #submit:hover { background: #e09010; }
+    #captureFrame {
+      padding: 8px 14px;
+      cursor: pointer;
+      background: #2463a6;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    #captureFrame:hover { background: #3179c4; }
+    .frame-capture-modal {
+      align-items: center;
+      background: rgba(0, 0, 0, 0.65);
+      display: flex;
+      inset: 0;
+      justify-content: center;
+      padding: 20px;
+      position: fixed;
+      z-index: 300;
+    }
+    .frame-capture-modal[hidden] { display: none; }
+    .frame-capture-card {
+      background: #171717;
+      border: 1px solid #555;
+      border-radius: 8px;
+      box-shadow: 0 10px 32px rgba(0, 0, 0, 0.5);
+      max-width: min(900px, calc(100vw - 40px));
+      padding: 14px;
+    }
+    .frame-capture-header { align-items: center; display: flex; gap: 12px; justify-content: space-between; }
+    .frame-capture-header h2 { font-size: 16px; margin: 0; }
+    .frame-capture-close { background: transparent; border: 0; color: #fff; cursor: pointer; font-size: 24px; line-height: 1; }
+    #frameCaptureImage { display: block; margin-top: 12px; max-height: min(68vh, 620px); max-width: 100%; }
+    #frameCaptureInfo { color: #ffd166; font-size: 12px; margin: 8px 0 0; }
+    #frameCaptureDownload {
+      background: #198754;
+      border-radius: 4px;
+      color: #fff;
+      display: inline-block;
+      margin-top: 12px;
+      padding: 7px 11px;
+      text-decoration: none;
+    }
   </style>
 </head>
 
@@ -193,22 +247,145 @@
       return results ? decodeURIComponent(results[1]) : 0;
     }
 
-    function submitAtCurrentPlayTime() {
+    function captureCurrentVideoFrameBase64() {
+      try {
+        var videoEl = document.querySelector("#vbsvideo_html5_api") || document.getElementById("vbsvideo");
+        if (videoEl && videoEl.videoWidth && videoEl.videoHeight) {
+          var canvas = document.createElement("canvas");
+          canvas.width = videoEl.videoWidth;
+          canvas.height = videoEl.videoHeight;
+          var ctx = canvas.getContext("2d");
+          ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+          var dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+          return dataUrl.replace(/^data:image\/jpeg;base64,/, "");
+        }
+      } catch (e) {
+        console.warn("Could not capture video canvas frame:", e);
+      }
+      return null;
+    }
+
+    async function getNearestThumbnail(videoId, currentFrame) {
+      if (!urlVBSService || !thumbnailUrl) return null;
+
+      var response = await fetchWithTimeout(
+        urlVBSService.replace(/\/$/, "") + "/getAllVideoKeyframes/?videoId=" + encodeURIComponent(videoId),
+        { method: "GET" },
+        10000
+      );
+      if (!response.ok) throw new Error("Unable to find an indexed thumbnail for this video.");
+
+      var frameIds = await response.json();
+      if (!Array.isArray(frameIds) || !frameIds.length) return null;
+
+      var nearestFrameId = frameIds.reduce(function (nearest, candidate) {
+        var candidateFrame = getFrameIndexFromId(candidate);
+        var nearestFrame = getFrameIndexFromId(nearest);
+        if (!isFinite(candidateFrame)) return nearest;
+        if (!isFinite(nearestFrame) || Math.abs(candidateFrame - currentFrame) < Math.abs(nearestFrame - currentFrame)) {
+          return candidate;
+        }
+        return nearest;
+      }, frameIds[0]);
+
+      if (!isFinite(getFrameIndexFromId(nearestFrameId))) return null;
+      var thumbnailFrameId = String(nearestFrameId).replace(/\.(?:jpe?g|png|webp)$/i, "");
+      return {
+        frameId: thumbnailFrameId,
+        url: thumbnailUrl + videoId + "/" + thumbnailFrameId + ".webp"
+      };
+    }
+
+    function pausePlayback() {
       if (youtubeFallbackActive) {
         if (youtubePlayer && youtubePlayer.pauseVideo) youtubePlayer.pauseVideo();
-      } else {
+      } else if (myPlayer && typeof myPlayer.pause === "function") {
         myPlayer.pause();
       }
-      var whereYouAt = youtubeFallbackActive
+    }
+
+    function getCurrentPlaybackTime() {
+      return youtubeFallbackActive
         ? (youtubePlayer && youtubePlayer.getCurrentTime ? youtubePlayer.getCurrentTime() : currentSeekTime)
-        : myPlayer.currentTime();
-      videoid = $.urlParam('videoid');
+        : (myPlayer && typeof myPlayer.currentTime === "function" ? myPlayer.currentTime() : 0);
+    }
+
+    function showFrameCapture(imageUrl, fileName, info) {
+      document.getElementById("frameCaptureImage").src = imageUrl;
+      document.getElementById("frameCaptureImage").alt = "Captured frame " + fileName;
+      document.getElementById("frameCaptureInfo").textContent = info;
+      var download = document.getElementById("frameCaptureDownload");
+      download.href = imageUrl;
+      download.download = fileName;
+      document.getElementById("frameCaptureModal").hidden = false;
+    }
+
+    function closeFrameCapture() {
+      document.getElementById("frameCaptureModal").hidden = true;
+    }
+
+    async function captureFrameAtCurrentPlayTime() {
+      pausePlayback();
+      var whereYouAt = getCurrentPlaybackTime();
+      var videoid = $.urlParam('videoid');
       var currentFrame = ffmpegFrameIndex(whereYouAt, videoFps);
       var currentFrameId = videoid + '-' + padFrame(currentFrame);
+      var capturedBase64 = captureCurrentVideoFrameBase64();
+
+      try {
+        if (capturedBase64) {
+          showFrameCapture(
+            "data:image/jpeg;base64," + capturedBase64,
+            currentFrameId + ".jpg",
+            "Captured exactly at frame " + padFrame(currentFrame) + "."
+          );
+          return;
+        }
+
+        var thumbnail = await getNearestThumbnail(videoid, currentFrame);
+        if (!thumbnail) throw new Error("No indexed thumbnail is available for this video position.");
+        showFrameCapture(
+          thumbnail.url,
+          thumbnail.frameId + ".webp",
+          "YouTube fallback: requested " + padFrame(currentFrame) + ", showing nearest indexed frame " + thumbnail.frameId + "."
+        );
+      } catch (error) {
+        showKISServerResponse("Capture failed", error.message, true);
+      }
+    }
+
+    async function submitAtCurrentPlayTime() {
+      pausePlayback();
+      var whereYouAt = getCurrentPlaybackTime();
+      var videoid = $.urlParam('videoid');
+      var currentFrame = ffmpegFrameIndex(whereYouAt, videoFps);
+      var currentFrameId = videoid + '-' + padFrame(currentFrame);
+      var capturedBase64 = captureCurrentVideoFrameBase64();
+
       showKISServerResponse('Submitting result', 'Waiting for the submission service response...', false);
-      submitExternalResult({ imgId: currentFrameId, videoId: videoid })
-        .then(function (response) { showKISServerResponse('Submission successful', response, false); })
-        .catch(function (error) { showKISServerResponse('Submission failed', error.message, true); });
+      try {
+        var selectedItem = {
+          imgId: currentFrameId,
+          videoId: videoid,
+          image_base64: capturedBase64,
+          image_mime_type: capturedBase64 ? "image/jpeg" : null
+        };
+
+        // A YouTube iframe cannot be captured into a canvas. Submit the nearest
+        // indexed thumbnail instead of a blank placeholder image.
+        if (!capturedBase64) {
+          var thumbnail = await getNearestThumbnail(videoid, currentFrame);
+          if (!thumbnail) {
+            throw new Error("No indexed thumbnail is available for the current video position.");
+          }
+          selectedItem.image_url = thumbnail.url;
+        }
+
+        var response = await submitExternalResult(selectedItem);
+        showKISServerResponse('Submission successful', response, false);
+      } catch (error) {
+        showKISServerResponse('Submission failed', error.message, true);
+      }
     }
   </script>
 
@@ -227,6 +404,14 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>
       <span>Play video</span>
     </button>
+  </div>
+
+  <div id="playbackRateControl">
+    <label for="playbackRate">Speed</label>
+    <span class="limit">0.5×</span>
+    <input id="playbackRate" type="range" min="0.5" max="4" step="0.25" value="1" aria-label="Video playback speed" />
+    <span class="limit">4×</span>
+    <output id="playbackRateValue" for="playbackRate">1×</output>
   </div>
 
   <div id="frameHud">
@@ -264,6 +449,23 @@
       onclick="submitAtCurrentPlayTime();">
       Submit
     </button>
+    <button id="captureFrame"
+      title="Capture and preview the current frame"
+      onclick="captureFrameAtCurrentPlayTime();">
+      Capture frame
+    </button>
+  </div>
+
+  <div id="frameCaptureModal" class="frame-capture-modal" hidden role="dialog" aria-modal="true" aria-labelledby="frameCaptureTitle">
+    <div class="frame-capture-card">
+      <div class="frame-capture-header">
+        <h2 id="frameCaptureTitle">Captured frame</h2>
+        <button type="button" class="frame-capture-close" aria-label="Close captured frame" onclick="closeFrameCapture();">&times;</button>
+      </div>
+      <img id="frameCaptureImage" alt="" />
+      <p id="frameCaptureInfo"></p>
+      <a id="frameCaptureDownload" target="_blank" rel="noopener">Open / download image</a>
+    </div>
   </div>
 
 <script type="text/javascript">
@@ -277,6 +479,24 @@
   var youtubeFallbackActive = false;
   var currentSeekTime = 0;
   var youtubeApiPromise = null;
+  var playbackRate = 1;
+
+  function formatPlaybackRate(rate) {
+    return (Number.isInteger(rate) ? rate.toFixed(0) : rate.toFixed(2).replace(/0$/, "")) + "×";
+  }
+
+  function setPlaybackRate(value) {
+    var rate = Math.max(0.5, Math.min(4, Number(value) || 1));
+    playbackRate = rate;
+    document.getElementById("playbackRate").value = String(rate);
+    document.getElementById("playbackRateValue").textContent = formatPlaybackRate(rate);
+
+    if (youtubeFallbackActive) {
+      if (youtubePlayer && youtubePlayer.setPlaybackRate) youtubePlayer.setPlaybackRate(rate);
+    } else if (myPlayer && typeof myPlayer.playbackRate === "function") {
+      myPlayer.playbackRate(rate);
+    }
+  }
 
   function padFrame(n) {
     var s = String(Math.max(0, n | 0));
@@ -435,6 +655,7 @@
           onReady: function (event) {
             event.target.unMute();
             event.target.seekTo(seekTime, true);
+            event.target.setPlaybackRate(playbackRate);
             event.target.pauseVideo();
             updateYoutubePlayButton(YT.PlayerState.PAUSED);
             updateHud();
@@ -498,6 +719,7 @@
     });
 
     myPlayer.src({ type: "video/mp4", src: url });
+    setPlaybackRate(playbackRate);
 
     myPlayer.one("error", function () {
       switchToYoutube(videoId, seekTime);
@@ -541,6 +763,9 @@
     myPlayer.on("play", updateHud);
     myPlayer.on("pause", updateHud);
     document.getElementById("youtubePlayButton").addEventListener("click", playYoutubeFallback);
+    document.getElementById("playbackRate").addEventListener("input", function (event) {
+      setPlaybackRate(event.target.value);
+    });
   }
 
   loadConfig().then(loadPage);
