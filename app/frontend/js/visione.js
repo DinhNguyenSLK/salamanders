@@ -552,12 +552,15 @@ function bindSearchSceneDelegates() {
       const canvas = canvases[idx];
       if (canvas) {
         canvas.discardActiveObject();
-        canvas.getObjects().slice().forEach(function (object) {
-          if (object.get("type") !== "line") {
-            $("#" + object.get("uuid")).hide();
-            canvas.remove(object);
-          }
-        });
+        canvas
+          .getObjects()
+          .slice()
+          .forEach(function (object) {
+            if (object.get("type") !== "line") {
+              $("#" + object.get("uuid")).hide();
+              canvas.remove(object);
+            }
+          });
         canvas.renderAll();
       }
     } else {
@@ -663,13 +666,16 @@ function bindSearchSceneDelegates() {
     const $group = $btn.closest(".object-count-range");
     const $panel = $btn.closest(".field-panel-body");
     const $textarea = $panel.find('textarea[id^="not"]');
-    
-    $group.find(".object-count-range-btn").removeClass("active").attr("aria-pressed", "false");
+
+    $group
+      .find(".object-count-range-btn")
+      .removeClass("active")
+      .attr("aria-pressed", "false");
     $btn.addClass("active").attr("aria-pressed", "true");
-    
+
     const rangeVal = $btn.attr("data-range");
     $textarea.attr("data-range", rangeVal);
-    
+
     const idx = parseInt($textarea.attr("id").replace("not", ""), 10);
     markSceneDirty(idx);
     searchByForm();
@@ -698,8 +704,7 @@ function openImagePreview() {
 
   modalImage.src = image.src;
   download.href = image.src;
-  download.download =
-    image.dataset.downloadName || "generated-image.png";
+  download.download = image.dataset.downloadName || "generated-image.png";
   modal.hidden = false;
   document.body.classList.add("image-preview-open");
   document.getElementById("imagePreviewClose")?.focus();
@@ -742,10 +747,12 @@ document.addEventListener("keydown", function (event) {
 });
 
 function generateImage() {
-  const prompt = (document.getElementById("imageGenerationPrompt")?.value || "").trim();
+  const prompt = (
+    document.getElementById("imageGenerationPrompt")?.value || ""
+  ).trim();
   const mode =
-    document.querySelector('input[name="imageGenerationMode"]:checked')?.value ||
-    "single";
+    document.querySelector('input[name="imageGenerationMode"]:checked')
+      ?.value || "single";
   const btn = document.getElementById("imageGenerationBtn");
   const status = document.getElementById("imageGenerationStatus");
   const result = document.getElementById("imageGenerationResult");
@@ -756,7 +763,8 @@ function generateImage() {
     return;
   }
   if (!urlVBSService) {
-    if (status) status.textContent = "Image generation service URL is not configured.";
+    if (status)
+      status.textContent = "Image generation service URL is not configured.";
     return;
   }
 
@@ -803,7 +811,8 @@ function generateImage() {
     })
     .catch(function (err) {
       console.error("image generation failed:", err);
-      if (status) status.textContent = "Image generation failed: " + err.message;
+      if (status)
+        status.textContent = "Image generation failed: " + err.message;
     })
     .finally(function () {
       if (btn) btn.disabled = false;
@@ -1360,10 +1369,8 @@ function cell2Text(idx) {
   let queryParameters = {
     textual_model: textualMode[idx] || "all",
     operator: occur[idx] || "and",
-    ocr_operator:
-      $("#ocrOperator" + idx).attr("data-operator") || "or",
-    asr_operator:
-      $("#asrOperator" + idx).attr("data-operator") || "or",
+    ocr_operator: $("#ocrOperator" + idx).attr("data-operator") || "or",
+    asr_operator: $("#asrOperator" + idx).attr("data-operator") || "or",
   };
 
   let textual = "";
@@ -1549,16 +1556,16 @@ function searchByForm() {
   search2(buildSearchPayload(queryItems, paramItems));
 }
 
-function setResults(data) {
+function setResults(data, preserveBackendOrder = rearrange) {
   results = data;
-  // Backend _slice interleaves videos in rounds (n_frames_per_round each),
-  // so the same videoId reappears later. Collapse to one contiguous block
-  // per video (order = first appearance = best-score video order).
-  resultsSortedByVideo = groupResultsByVideo(data);
+  // Unless the backend has rearranged results, collapse interleaved video
+  // rounds into contiguous, score-ranked video groups.
+  resultsSortedByVideo = groupResultsByVideo(data, preserveBackendOrder);
   groupResults(document.getElementById("group"));
 }
 
-function groupResultsByVideo(data) {
+function groupResultsByVideo(data, preserveBackendOrder = rearrange) {
+ 
   if (!data) return [];
   let list = data;
   if (typeof data === "string") {
@@ -1569,6 +1576,9 @@ function groupResultsByVideo(data) {
     }
   }
   if (!Array.isArray(list) || list.length === 0) return [];
+
+  // Rearranged results are already ordered by the backend; preserve that order.
+  if (preserveBackendOrder) return list;
 
   const groups = new Map();
   for (let i = 0; i < list.length; i++) {
@@ -1667,7 +1677,7 @@ function search2(payload) {
       success: function (data) {
         _searchXhr = null;
         setSearchLatency(performance.now() - requestStartedAt, "ready");
-        setResults(data);
+        setResults(data, payload.rearrange);
       },
       error: function (xhr, status, error) {
         if (status === "abort") return;
@@ -1872,7 +1882,10 @@ function setTopK(value, triggerSearch = false) {
     if (String(slider.value) !== String(topK)) slider.value = topK;
     const min = parseFloat(slider.min) || 100;
     const max = parseFloat(slider.max) || 10000;
-    const progress = Math.max(0, Math.min(100, ((topK - min) / (max - min)) * 100));
+    const progress = Math.max(
+      0,
+      Math.min(100, ((topK - min) / (max - min)) * 100),
+    );
     slider.style.setProperty("--range-progress", progress + "%");
   }
   if (triggerSearch) searchByForm();
@@ -2159,7 +2172,8 @@ function loadImages(startIndex, endIndex) {
 
     let isHighPriorityVideo = resrowIdx < videoBatchSize;
     let isTopFrameOfVideo = resColIdx === 1;
-    let imgLoading = isHighPriorityVideo || isTopFrameOfVideo ? "eager" : "lazy";
+    let imgLoading =
+      isHighPriorityVideo || isTopFrameOfVideo ? "eager" : "lazy";
     let imgFetchPriority = isHighPriorityVideo ? "high" : "low";
 
     let frameHtml =
@@ -2296,7 +2310,11 @@ function submitQA() {
 
 function submitAlert() {
   // KIS uses the editable submit dialog as its only confirmation step.
-  if (localStorage.getItem("taskType") != "avs" && localStorage.getItem("taskType") != "kis" && localStorage.getItem("taskType") != "qa") {
+  if (
+    localStorage.getItem("taskType") != "avs" &&
+    localStorage.getItem("taskType") != "kis" &&
+    localStorage.getItem("taskType") != "qa"
+  ) {
     if (!confirm("Are you sure you want to submit?")) {
       return false;
     }
@@ -2345,9 +2363,15 @@ const KIS_SUBMIT_BASE_URL = "http://192.168.28.151:5000/api/v2/submit/";
 
 function openSubmitSettings() {
   if (!document.getElementById("submitSettingsModal")) {
-    const sessionId = prompt("KIS session ID", localStorage.getItem("kisSessionId") || "");
+    const sessionId = prompt(
+      "KIS session ID",
+      localStorage.getItem("kisSessionId") || "",
+    );
     if (sessionId === null) return;
-    const evaluationId = prompt("KIS evaluation ID", localStorage.getItem("kisEvaluationId") || "");
+    const evaluationId = prompt(
+      "KIS evaluation ID",
+      localStorage.getItem("kisEvaluationId") || "",
+    );
     if (evaluationId === null) return;
     localStorage.setItem("kisSessionId", sessionId.trim());
     localStorage.setItem("kisEvaluationId", evaluationId.trim());
@@ -2375,7 +2399,10 @@ function closeUserInfo() {
 
 function saveSubmitSettings() {
   localStorage.setItem("kisSessionId", $("#submitSessionId").val().trim());
-  localStorage.setItem("kisEvaluationId", $("#submitEvaluationId").val().trim());
+  localStorage.setItem(
+    "kisEvaluationId",
+    $("#submitEvaluationId").val().trim(),
+  );
   closeSubmitSettings();
 }
 
@@ -2409,7 +2436,13 @@ function submitKISFrame(frameId, videoId) {
   }
   try {
     const timestampMs = getFrameTimestampMs(frameId, videoId);
-    return submitKISValues(videoId, timestampMs, timestampMs, sessionId, evaluationId);
+    return submitKISValues(
+      videoId,
+      timestampMs,
+      timestampMs,
+      sessionId,
+      evaluationId,
+    );
   } catch (error) {
     return Promise.reject(error);
   }
@@ -2419,7 +2452,9 @@ function submitKISValues(videoId, startMs, endMs, sessionId, evaluationId) {
   sessionId = sessionId || localStorage.getItem("kisSessionId") || "";
   evaluationId = evaluationId || localStorage.getItem("kisEvaluationId") || "";
   const payload = {
-    answerSets: [{ answers: [{ mediaItemName: videoId, start: startMs, end: endMs }] }],
+    answerSets: [
+      { answers: [{ mediaItemName: videoId, start: startMs, end: endMs }] },
+    ],
   };
   const url = KIS_SUBMIT_BASE_URL + encodeURIComponent(evaluationId);
 
@@ -2437,7 +2472,13 @@ function submitKISValues(videoId, startMs, endMs, sessionId, evaluationId) {
 
 function formatDresServerResponse(response, body) {
   const statusText = response.statusText ? " " + response.statusText : "";
-  return "HTTP " + response.status + statusText + "\n\n" + (body || "(DRES returned an empty response)");
+  return (
+    "HTTP " +
+    response.status +
+    statusText +
+    "\n\n" +
+    (body || "(DRES returned an empty response)")
+  );
 }
 
 function submitQAFrame(frameId, videoId) {
@@ -2481,34 +2522,43 @@ function askQAAnswer(videoId, timestampMs) {
       modal = document.createElement("div");
       modal.id = "qaAnswerModal";
       modal.className = "submit-settings-modal kis-submit-confirm-modal";
-      modal.innerHTML = '<div class="submit-settings-card kis-submit-confirm-card qa-answer-card">' +
+      modal.innerHTML =
+        '<div class="submit-settings-card kis-submit-confirm-card qa-answer-card">' +
         '<div class="submit-settings-header"><span>QA answer</span><button type="button" class="submit-settings-close" data-qa-cancel>&times;</button></div>' +
-        '<div class="qa-answer-context">' + videoId + ' &middot; ' + timestampMs + ' ms</div>' +
+        '<div class="qa-answer-context">' +
+        videoId +
+        " &middot; " +
+        timestampMs +
+        " ms</div>" +
         '<label>Answer<textarea id="qaAnswerInput" rows="4" placeholder="Type your answer..."></textarea></label>' +
         '<div class="submit-settings-actions"><button type="button" data-qa-cancel>Cancel</button><button type="button" class="submit-settings-save" data-qa-submit>Submit</button></div>' +
-        '</div>';
+        "</div>";
       document.body.appendChild(modal);
     } else {
-      $(modal).find(".qa-answer-context").text(videoId + " · " + timestampMs + " ms");
+      $(modal)
+        .find(".qa-answer-context")
+        .text(videoId + " · " + timestampMs + " ms");
     }
     $("#qaAnswerInput").val("").trigger("focus");
     $(modal).prop("hidden", false);
-    $(modal).off("click.qaAnswer").on("click.qaAnswer", function (event) {
-      if (event.target === modal || $(event.target).is("[data-qa-cancel]")) {
-        $(modal).prop("hidden", true);
-        const cancelled = new Error("QA submission cancelled");
-        cancelled.cancelled = true;
-        reject(cancelled);
-      } else if ($(event.target).is("[data-qa-submit]")) {
-        const answer = $("#qaAnswerInput").val().trim();
-        if (!answer) {
-          alert("Please enter an answer.");
-          return;
+    $(modal)
+      .off("click.qaAnswer")
+      .on("click.qaAnswer", function (event) {
+        if (event.target === modal || $(event.target).is("[data-qa-cancel]")) {
+          $(modal).prop("hidden", true);
+          const cancelled = new Error("QA submission cancelled");
+          cancelled.cancelled = true;
+          reject(cancelled);
+        } else if ($(event.target).is("[data-qa-submit]")) {
+          const answer = $("#qaAnswerInput").val().trim();
+          if (!answer) {
+            alert("Please enter an answer.");
+            return;
+          }
+          $(modal).prop("hidden", true);
+          resolve(answer);
         }
-        $(modal).prop("hidden", true);
-        resolve(answer);
-      }
-    });
+      });
   });
 }
 
@@ -2518,14 +2568,19 @@ function showKISServerResponse(title, message, isError) {
     modal = document.createElement("div");
     modal.id = "kisServerResponseModal";
     modal.className = "submit-settings-modal kis-submit-confirm-modal";
-    modal.innerHTML = '<div class="submit-settings-card kis-submit-confirm-card">' +
+    modal.innerHTML =
+      '<div class="submit-settings-card kis-submit-confirm-card">' +
       '<div class="submit-settings-header"><span id="kisServerResponseTitle"></span><button type="button" class="submit-settings-close" data-kis-response-close>&times;</button></div>' +
       '<pre id="kisServerResponseBody" class="kis-server-response-body"></pre>' +
       '<div class="submit-settings-actions"><button type="button" class="submit-settings-save" data-kis-response-close>Close</button></div>' +
-      '</div>';
+      "</div>";
     document.body.appendChild(modal);
     $(modal).on("click.kisResponse", function (event) {
-      if (event.target === modal || $(event.target).is("[data-kis-response-close]")) $(modal).prop("hidden", true);
+      if (
+        event.target === modal ||
+        $(event.target).is("[data-kis-response-close]")
+      )
+        $(modal).prop("hidden", true);
     });
   }
   $("#kisServerResponseTitle").text(title);
@@ -2553,7 +2608,11 @@ function submitVersion2(selectedItem) {
   $("#submitted_bar").css("display", "block");
   let res = null;
   if (localStorage.getItem("taskType") === "qa") {
-    showKISServerResponse("Submitting to DRES", "Waiting for the DRES server response...", false);
+    showKISServerResponse(
+      "Submitting to DRES",
+      "Waiting for the DRES server response...",
+      false,
+    );
     submitQAFrame(selectedItem.imgId, selectedItem.videoId)
       .then(function (response) {
         showKISServerResponse("DRES server response", response, false);
@@ -2569,14 +2628,22 @@ function submitVersion2(selectedItem) {
   } else {
     if (submitAlert()) {
       if (localStorage.getItem("taskType") === "kis") {
-        showKISServerResponse("Submitting to DRES", "Waiting for the DRES server response...", false);
+        showKISServerResponse(
+          "Submitting to DRES",
+          "Waiting for the DRES server response...",
+          false,
+        );
         submitKISFrame(selectedItem.imgId, selectedItem.videoId)
           .then(function (response) {
             showKISServerResponse("DRES server response", response, false);
           })
           .catch(function (error) {
             console.error("KIS submit failed:", error);
-            showKISServerResponse("DRES submission failed", error.message, true);
+            showKISServerResponse(
+              "DRES submission failed",
+              error.message,
+              true,
+            );
           });
       } else if (localStorage.getItem("taskType") === "avs")
         submitResult(
@@ -3719,10 +3786,12 @@ function initResultDragScroll() {
   let dragState = null;
   let suppressClickScroller = null;
   let suppressClickTimer = null;
-  const interactiveSelector = "a, button, input, textarea, select, [role='button']";
+  const interactiveSelector =
+    "a, button, input, textarea, select, [role='button']";
 
   root.addEventListener("dragstart", function (event) {
-    if (event.target.closest(".video-frames-scroll img")) event.preventDefault();
+    if (event.target.closest(".video-frames-scroll img"))
+      event.preventDefault();
   });
 
   root.addEventListener("pointerdown", function (event) {
@@ -3889,7 +3958,8 @@ function initVideoTypeDropdown(select) {
     document.addEventListener("pointerdown", function (event) {
       if (!dropdown.contains(event.target)) dropdown.open = false;
       const utilityFilter = document.querySelector(".utility-filter");
-      if (utilityFilter && !utilityFilter.contains(event.target)) utilityFilter.open = false;
+      if (utilityFilter && !utilityFilter.contains(event.target))
+        utilityFilter.open = false;
     });
     dropdown.dataset.outsideCloseBound = "true";
   }

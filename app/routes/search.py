@@ -104,14 +104,14 @@ async def search(
             vf_query = queryObj.parseVf()
             results = vector_search.search("vf", vf_query, k)
             filtered_results = _filter(results, pre_filter_results)
-            sliced_results = _slice(filtered_results, n_frames_per_round)
+            sliced_results = _slice(filtered_results, n_frames_per_round, False)
             return sliced_results
 
         if queryObj.get("qbe"):
             qbe_query = queryObj.parseQbe()
             results = vector_search.search("qbe", qbe_query, k)
             filtered_results = _filter(results, pre_filter_results)
-            sliced_results = _slice(filtered_results, n_frames_per_round)
+            sliced_results = _slice(filtered_results, n_frames_per_round, False)
             return sliced_results
 
         # Composed Part

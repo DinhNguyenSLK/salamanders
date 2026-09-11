@@ -192,7 +192,7 @@ def _slice(
     Mỗi vòng lấy tối đa n_frames_per_round frame của mỗi video.
     Thứ tự các video được quyết định bởi score cao nhất của video đó.
     """
-   
+    print("Rearrange: ", rearrange)
     if not results:
         return []
     
@@ -224,7 +224,7 @@ def _slice(
             output.extend(group[:take])
             continue
         else:
-            print("di vao day")
+            
             selected = []
             distinct = set()
             duplicated_list = []
@@ -241,9 +241,10 @@ def _slice(
 
             if len(selected) < take:
                 selected.extend(duplicated_list[:take - len(selected)])
-
+            
             output.extend(selected)
 
+    
     print(len(output))
     return output
     
