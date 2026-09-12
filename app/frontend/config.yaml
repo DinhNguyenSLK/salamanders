@@ -26,7 +26,7 @@ ui:
   textual-modes:
     - { name: "SigLIP2", mode: "siglip2" }
     - { name: "MetaCLIP2", mode: "metaclip2" }
-    - { name: "ALIGN (cpu)", mode: "align" }
+    - { name: "All", mode: "align" }
     
 
   # Parameters of the object search UI.

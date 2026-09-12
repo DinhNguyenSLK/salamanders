@@ -149,36 +149,104 @@ def _temporal(all_results: list[list[SearchResult]]) -> list[SearchResult]:
     ]
 
 
-def _merge(tab_results: dict[str, list[SearchResult]]) -> list[SearchResult]:
+def _merge(
+    tab_results: dict[str, list[SearchResult]],
+    alpha: float = 1.0,
+    epsilon: float = 1e-8,
+) -> list[SearchResult]:
     """
-    Tính Weighted RRF
+    Merge results using:
+    1. Min-max normalization per channel.
+    2. Geometric mean over channels where the result appears.
+    3. Coverage penalty based on the number of channels containing the result.
     """
     if not tab_results:
         return []
-    
-    weights = {
-        "textual": 1,
-        "object_pos": 1,
-        "ocr": 1,
-        "asr": 1,
-        "tags": 1
-    }
 
-    new_results = dict()
+    all_channels = list(tab_results.keys())
+    num_channels = len(all_channels)
 
-    for name, results in tab_results.items():
+    if num_channels == 0:
+        return []
 
-        for rank, result in enumerate(results):
+    # ---------------------------------------------------------
+    # 1. Min-max normalize scores independently for each channel
+    # ---------------------------------------------------------
+    normalized_results: dict[str, dict[str, float]] = {}
 
+    for channel, results in tab_results.items():
+        if not results:
+            normalized_results[channel] = {}
+            continue
+
+        scores = [result.score for result in results]
+
+        min_score = min(scores)
+        max_score = max(scores)
+        score_range = max_score - min_score
+
+        channel_scores = {}
+
+        for result in results:
+            if score_range > 0:
+                normalized_score = (
+                    result.score - min_score
+                ) / score_range
+            else:
+                # All results have the same score in this channel.
+                normalized_score = 1.0
+
+            channel_scores[result.imgId] = normalized_score
+
+        normalized_results[channel] = channel_scores
+
+    # ---------------------------------------------------------
+    # 2. Collect all unique results
+    # ---------------------------------------------------------
+    new_results: dict[str, SearchResult] = {}
+
+    for results in tab_results.values():
+        for result in results:
             if result.imgId not in new_results:
-                result.score = 0
                 new_results[result.imgId] = result
-            
-            new_results[result.imgId].score += weights[name]*(100/(100 + rank))
-    
-    list_results = sorted(new_results.values(), key=lambda x: x.score, reverse=True)
 
-    return list_results
+    # ---------------------------------------------------------
+    # 3. Geometric mean + coverage penalty
+    # ---------------------------------------------------------
+    for img_id, result in new_results.items():
+
+        present_channels = []
+
+        for channel in all_channels:
+            if img_id in normalized_results[channel]:
+                present_channels.append(channel)
+
+        if not present_channels:
+            result.score = 0.0
+            continue
+
+        # Geometric mean over channels where the result appears
+        product = 1.0
+
+        for channel in present_channels:
+            normalized_score = normalized_results[channel][img_id]
+            product *= normalized_score + epsilon
+
+        geometric_mean = product ** (1.0 / len(present_channels))
+
+        # Coverage penalty
+        coverage = len(present_channels) / num_channels
+
+        result.score = geometric_mean * (coverage ** alpha)
+
+    # ---------------------------------------------------------
+    # 4. Sort by final score
+    # ---------------------------------------------------------
+    return sorted(
+        new_results.values(),
+        key=lambda x: x.score,
+        reverse=True,
+    )
 
 
 def _slice(
