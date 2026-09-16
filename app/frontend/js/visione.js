@@ -499,6 +499,7 @@ function removeLastSearchScene() {
     if (canvases[idx]) canvases[idx].dispose();
   } catch (e) {}
   $("#canvasTab" + idx).remove();
+  $("#modelScene" + idx).remove();
   canvases.pop();
   textualMode.pop();
   occur.pop();
@@ -528,6 +529,7 @@ function removeLastSearchScene() {
 }
 
 function initSearchScenes() {
+  $("#utilityModelOptions").empty();
   tempSearchForms = 0;
   canvases = [];
   $("#searchTab").empty();

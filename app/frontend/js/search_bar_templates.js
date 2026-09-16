@@ -31,7 +31,6 @@ function orderScenePanels(canvasID) {
   if (!scene || !fieldGroup) return;
 
   const panelOrder = [
-    document.getElementById(`textualOptions${canvasID}`),
     document.getElementById(`textual${canvasID}_container`),
     document.getElementById(`panel_ocr${canvasID}`),
     document.getElementById(`panel_asr${canvasID}`),
@@ -42,8 +41,35 @@ function orderScenePanels(canvasID) {
   ];
 
   panelOrder.forEach((panel) => panel && scene.appendChild(panel));
+  const modelOptions = document.getElementById(`textualOptions${canvasID}`);
+  const modelMenu = document.getElementById("utilityModelOptions");
+  if (modelOptions && modelMenu) {
+    const group = document.createElement("div");
+    group.id = `modelScene${canvasID}`;
+    group.className = "utility-model-scene";
+    group.setAttribute("role", "group");
+    group.setAttribute("aria-label", `Scene ${canvasID + 1} model`);
+    const label = document.createElement("div");
+    label.className = "ctrl-label";
+    label.textContent = `Scene ${canvasID + 1}`;
+    group.append(label, modelOptions);
+    modelMenu.appendChild(group);
+  }
   fieldGroup.remove();
 }
+
+document.addEventListener("pointerdown", function (event) {
+  const menu = document.querySelector(".utility-model");
+  if (menu && !menu.contains(event.target)) menu.open = false;
+});
+
+document.addEventListener("keydown", function (event) {
+  const menu = document.querySelector(".utility-model");
+  if (event.key === "Escape" && menu && menu.open) {
+    menu.open = false;
+    menu.querySelector("summary").focus();
+  }
+});
 
 function sceneInfoText(canvasID) {
   if (canvasID === 0) return "Scene 1";
