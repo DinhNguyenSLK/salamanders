@@ -1,7 +1,7 @@
 var regex_to_match_keyframe_number = /_(\d+(?:_\d+)?)(?:-(\d+))?$|-(\d+)$/;
 var cells = 49;
-var canvasWidth = 275;
-var canvasHeight = 154;
+var canvasWidth = 225;
+var canvasHeight = 126;
 
 CELL_COLS = 7;
 CELL_ROWS = 7;
@@ -636,7 +636,6 @@ function bindSearchSceneDelegates() {
     if (isNaN(idx) || !isCanvasClean[idx]) return;
     isCanvasClean[idx] = false;
     sceneCleanUndo(idx);
-    searchByForm();
   });
 
   $tab.on(
@@ -876,8 +875,7 @@ function rewriteSceneQuery(idx) {
     return;
   }
 
-  const mode =
-    $('input[name="rewriteMode' + idx + '"]:checked').val() || "exploit";
+  const mode = "exploit";
   const base = urlVBSService.replace(/\/$/, "");
   const url =
     base +
@@ -1822,10 +1820,6 @@ function setTextualMode(checkboxId, mode) {
 
 function setTextualMode(checkboxId, mode) {
   textualMode[checkboxId] = mode;
-  textQuery = $("#textual" + checkboxId).val();
-  if (textQuery && textQuery.length > 0) {
-    searchByForm();
-  }
 }
 /*
 function setTextualMode(checkboxId) {
@@ -1871,7 +1865,6 @@ function undoCanvas() {
       disableCanvas(i, true);
     }
   }
-  searchByForm();
 }
 
 function setCanvasState(canvasId) {
@@ -2736,15 +2729,15 @@ const imgResult = (
 		<div class="result-border" style="border-color: ${borderColor};">
 			<div class="myimg-thumbnail" id="${res.imgId}" lang="${res.videoId}|${res.videoUrlPreview}" data-img-id="${res.imgId}">
 				<img loading="${imgLoading}" fetchpriority="${imgFetchPriority}" decoding="async" id="img${res.imgId}" class="myimg" src="${res.thumb}" onclick='avsToggle(${jsonString}, event)' />
-			</div>
 			<div id="toolbar_icons_${res.imgId}" class="result-toolbar">
-				<a class="result-frame-id" title="View annotations of ${res.frameName}, Score: ${res.score}" href="indexedData.html?videoId=${res.videoId}&id=${res.imgId}" target="_blank" onclick='markResultLightboxItemAsViewed(${jsonString})'>${res.frameNumber}</a>
 				<a class="result-action result-action-summary" title="Nearly keyframes" aria-label="Nearly keyframes" href="#" onclick='openNearbyKeyframes(${jsonString}); return false;'><i class="fas fa-th-large" aria-hidden="true"></i></a>
 				<a class="result-action result-action-play" href="#" title="Play video" aria-label="Play video" onclick="playVideoWindow('${res.videoUrl}', '${res.videoId}', '${res.imgId}'); return false;"><i class="fas fa-play" aria-hidden="true"></i></a>
 				<a class="result-action result-action-similarity isSimplified" href="#" title="Image similarity" aria-label="Image similarity" onclick="var queryObj=new Object(); queryObj.comboVisualSim='${res.imgId}'; searchByLink(queryObj); return false;"><i id="comboSim${res.imgId}" class="fas fa-clone" aria-hidden="true"></i></a>
 				<a class="result-action result-action-similarity isAdvanced" href="#" title="Visual similarity (DINOv2)" aria-label="Visual similarity (DINOv2)" onclick="var queryObj=new Object(); queryObj.vf='${res.imgId}'; searchByLink(queryObj); return false;"><i id="gemSim${res.imgId}" class="fas fa-clone" aria-hidden="true"></i></a>
 				<a id="submitBTN_${res.imgId}" class="result-action result-action-submit" href="#" title="Submit result" aria-label="Submit result" onclick='submitVersion2(${jsonString}); return false;'><i class="fas fa-paper-plane" aria-hidden="true"></i></a>
 			</div>
+			</div>
+				<a class="result-frame-id" title="View annotations of ${res.frameName}, Score: ${res.score}" href="indexedData.html?videoId=${res.videoId}&id=${res.imgId}" target="_blank" onclick='markResultLightboxItemAsViewed(${jsonString})'>${res.videoId}-${res.frameNumber}</a>
 		</div>
 		`;
 };
@@ -3148,8 +3141,8 @@ function applySidebarLayout() {
     $btn.attr("aria-expanded", "false").attr("title", "Hiện thanh công cụ");
   } else {
     $body.removeClass("sidebar-collapsed");
-    $sidebar.css({ width: "320px", maxWidth: "320px", display: "flex" });
-    $body.css("grid-template-columns", "320px minmax(0, 1fr) auto");
+    $sidebar.css({ width: "280px", maxWidth: "280px", display: "flex" });
+    $body.css("grid-template-columns", "280px minmax(0, 1fr) auto");
     $btn.attr("aria-expanded", "true").attr("title", "Ẩn thanh công cụ");
   }
 }
@@ -3688,7 +3681,6 @@ async function init() {
     if (isReset) {
       isReset = false;
       undoReset();
-      searchByForm();
     }
   });
 

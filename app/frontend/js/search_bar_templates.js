@@ -47,8 +47,7 @@ function sceneImagePanel(idx) {
   return `<div class="field-panel collapsed" id="panel_image${idx}">
     <button type="button" class="field-panel-toggle" aria-expanded="false" onclick="toggleFieldPanel(this)">Image example</button>
     <div class="field-panel-body scene-image-body">
-      <label for="sceneImageUrl${idx}" class="scene-image-label">Paste an image URL</label>
-      <input id="sceneImageUrl${idx}" type="url" class="field-input" placeholder="https://example.com/image.jpg" oninput="setSceneImageUrl(${idx}, this)" onkeydown="if(event.key==='Enter' && !event.isComposing){event.preventDefault();searchByForm();}">
+      <input id="sceneImageUrl${idx}" type="url" class="field-input" aria-label="Image URL" placeholder="Paste image URL" oninput="setSceneImageUrl(${idx}, this)" onkeydown="if(event.key==='Enter' && !event.isComposing){event.preventDefault();searchByForm();}">
       <label class="scene-image-upload" for="sceneImageFile${idx}"><i class="fa fa-upload" aria-hidden="true"></i> Upload image
         <input id="sceneImageFile${idx}" type="file" accept="image/*" onchange="uploadSceneImage(${idx}, this)">
       </label>
@@ -226,55 +225,31 @@ const searchForm = (
 			</div>
 		</div>
 
-		<div class="field-panel collapsed" id="panel_rewrite${canvasID}">
-			<button type="button" class="field-panel-toggle" aria-expanded="false" onclick="toggleFieldPanel(this)">Query rewrite</button>
-			<div class="field-panel-body rewrite-panel-body">
-				<div class="rewrite-toolbar">
-					<div class="rewrite-modes">
-						<label class="mode-chip">
-							<input type="radio" name="rewriteMode${canvasID}" id="rewriteMode${canvasID}_exploit" value="exploit" checked>
-							<span>Exploit</span>
-						</label>
-						<label class="mode-chip">
-							<input type="radio" name="rewriteMode${canvasID}" id="rewriteMode${canvasID}_explore" value="explore">
-							<span>Explore</span>
-						</label>
-						<label class="mode-chip">
-							<input type="radio" name="rewriteMode${canvasID}" id="rewriteMode${canvasID}_decompose" value="decompose">
-							<span>Decompose</span>
-						</label>
-					</div>
+		<div class="field-panel transcript-panel rewrite-panel collapsed" id="panel_rewrite${canvasID}">
+			<div class="field-panel-body">
+				<div class="mode-row compact-mode-picker fuzziness-mode-row">
+					<button type="button" class="field-panel-toggle transcript-label" aria-expanded="false" onclick="toggleFieldPanel(this)">Query rewrite</button>
 					<div class="rewrite-action-group">
-						<button type="button" id="rewriteBtn${canvasID}" class="rewrite-btn" title="Rewrite textual query">
-							<i class="fa fa-magic"></i> Rewrite
-						</button>
-						<button type="button" id="applyRewrite${canvasID}" class="rewrite-apply-btn" title="Apply rewritten query to textual field">
-							<i class="fa fa-arrow-up"></i> Apply to textual
-						</button>
+						<button type="button" id="rewriteBtn${canvasID}" class="field-operator-toggle rewrite-btn" title="Rewrite textual query"><i class="fa fa-magic" aria-hidden="true"></i> Rewrite</button>
+						<button type="button" id="applyRewrite${canvasID}" class="field-operator-toggle rewrite-apply-btn" title="Apply rewritten query to textual field"><i class="fa fa-arrow-up" aria-hidden="true"></i> Apply</button>
 					</div>
 				</div>
-				<textarea id="rewrite${canvasID}" class="font-normal field-input rewrite-output" rows="2"
-					placeholder="Rewritten query appears here — edit, then apply to textual above"></textarea>
+				<textarea id="rewrite${canvasID}" class="font-normal field-input rewrite-output" rows="2" aria-label="Rewritten query" placeholder="Edit rewritten query..."></textarea>
 			</div>
 		</div>
 
-		<div class="field-panel collapsed" id="panel_objects${canvasID}">
-			<button type="button" class="field-panel-toggle" aria-expanded="false" onclick="toggleFieldPanel(this)">Objects / grid</button>
+		<div class="field-panel transcript-panel collapsed" id="panel_objects${canvasID}">
 			<div class="field-panel-body">
-				<div class="scene-controls">
-					<span class="font-tiny">
-						<input type="radio" id="canvas${canvasID}_enabled" name="canvas${canvasID}" value="enabled" checked onchange="setCanvasState(${canvasID}, this)">
-						<label for="canvas${canvasID}_enabled" class="lbl-enabled">Enabled</label>
-						<input type="radio" id="canvas${canvasID}_disabled" name="canvas${canvasID}" value="disabled" onchange="setCanvasState(${canvasID}, this)">
-						<label for="canvas${canvasID}_disabled" class="lbl-disabled">Disabled</label>
-					</span>
-					<span class="font-tiny occur-controls">
-						Objects
+				<div class="mode-row compact-mode-picker fuzziness-mode-row">
+					<button type="button" class="field-panel-toggle transcript-label" aria-expanded="false" onclick="toggleFieldPanel(this)">Objects / grid</button>
+					<label class="mode-chip">
 						<input type="radio" id="and${canvasID}" name="occur${canvasID}" value="and" checked onchange="setOccur(this, ${canvasID})">
-						<label for="and${canvasID}">AND</label>
-						<input type="radio" id="or${canvasID}" name="occur${canvasID}" value="or" onchange="setOccur(this, ${canvasID})">
-						<label for="or${canvasID}">OR</label>
-					</span>
+						<span>AND</span>
+					</label>
+					<label class="mode-chip">
+							<input type="radio" id="or${canvasID}" name="occur${canvasID}" value="or" onchange="setOccur(this, ${canvasID})">
+						<span>OR</span>
+					</label>
 				</div>
 
 				<div id="canvasBlock${canvasID}" class="canvas-block"

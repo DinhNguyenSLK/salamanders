@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="css/jquery-ui.min.css" />
     <link rel="stylesheet" href="css/fontawesome.min.css" />
     <link rel="stylesheet" href="css/bootstrap.css" />
-    <link rel="stylesheet" href="css/visione.css?v=102" />
+    <link rel="stylesheet" href="css/visione.css?v=103" />
     <link rel="stylesheet" href="css/customSubmission.css?v=1" />
     <link rel="stylesheet" href="css/queryByExample.css?v=11" />
     <link rel="stylesheet" href="css/toggle.css" />
@@ -41,13 +41,13 @@
       </button>
       <div class="utility-task" aria-label="Task">
         <span class="utility-task-label">Task</span>
-        <label class="utility-radio-label">
-          <input type="radio" name="utility-option" value="kis" onclick="setTaskType('kis')" />
-          KIS (Known-Item Search)
+        <label class="utility-radio-label" title="Known-Item Search">
+          <input type="radio" aria-label="Known-Item Search" name="utility-option" value="kis" onclick="setTaskType('kis')" />
+          KIS
         </label>
-        <label class="utility-radio-label">
-          <input type="radio" name="utility-option" value="qa" onclick="setTaskType('qa')" />
-          Q&amp;A (Visual Question Answering)
+        <label class="utility-radio-label" title="Visual Question Answering">
+          <input type="radio" aria-label="Visual Question Answering" name="utility-option" value="qa" onclick="setTaskType('qa')" />
+          Q&amp;A
         </label>
       </div>
       <div id="utilityActions" class="utility-actions" aria-label="Additional utilities">
@@ -137,11 +137,12 @@
             <div class="sidebar-fixed">
               <div id="objectIconsPanel" class="object-icons-panel">
                 <div class="object-icons-header">
-                  <span class="object-icons-title">Object icons</span>
+                  <span class="object-icons-title"><i class="fa fa-th-large" aria-hidden="true"></i> Object icons</span>
                   <button
                     type="button"
                     id="objectIconsToggle"
                     class="object-icons-toggle"
+                    aria-label="Toggle object icons"
                     aria-expanded="true"
                     aria-controls="paletteContainer"
                     title="Thu gọn / mở rộng vùng icon object"
