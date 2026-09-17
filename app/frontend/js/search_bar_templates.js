@@ -4,15 +4,91 @@ const searchFormID = {
 
 const MAX_TEMPORAL_SCENES = 5;
 
+const sceneChannels = [
+  ["image", "Image example", "fa-image"],
+  ["ocr", "OCR", null],
+  ["asr", "ASR", "fa-microphone"],
+  ["objects", "Localized objects", "fa-th"],
+  ["not", "Object count", "fa-hashtag"],
+  ["tags", "Tags", "fa-tags"],
+  ["rewrite", "Query rewrite", "fa-magic"],
+];
+
+function setSceneChannel(idx, channel, expanded, focus = false) {
+  const panel = document.getElementById(`panel_${channel}${idx}`);
+  const button = document.getElementById(`channel_${channel}${idx}`);
+  if (!panel || !button) return;
+  panel.classList.toggle("collapsed", !expanded);
+  button.setAttribute("aria-expanded", String(expanded));
+  button.setAttribute("aria-pressed", String(expanded));
+  panel.querySelector(".field-panel-toggle").setAttribute("aria-expanded", String(expanded));
+  if (expanded && focus) {
+    const input = panel.querySelector('textarea, input:not([type="radio"]):not([type="hidden"]), select');
+    if (input) input.focus();
+    if (channel === "objects" && typeof canvases !== "undefined" && canvases[idx]) {
+      canvases[idx].calcOffset();
+      canvases[idx].renderAll();
+    }
+  }
+}
+
+function toggleSceneChannel(idx, channel) {
+  const button = document.getElementById(`channel_${channel}${idx}`);
+  setSceneChannel(idx, channel, button.getAttribute("aria-expanded") !== "true", true);
+}
+
+function sceneChannelToolbar(idx) {
+  return `<div class="scene-channels" role="group" aria-label="Scene ${idx + 1} search channels">
+    ${sceneChannels.map(([key, label, icon]) => `<button type="button" id="channel_${key}${idx}" class="channel-button" title="${label}" aria-label="${label}" aria-controls="panel_${key}${idx}" aria-expanded="false" aria-pressed="false" onclick="toggleSceneChannel(${idx}, '${key}')">${key === "ocr" ? '<span class="channel-letter" aria-hidden="true">O</span>' : `<i class="fa ${icon}" aria-hidden="true"></i>`}<span class="channel-tooltip">${label}</span></button>`).join("")}
+  </div>`;
+}
+
+function sceneImagePanel(idx) {
+  return `<div class="field-panel collapsed" id="panel_image${idx}">
+    <button type="button" class="field-panel-toggle" aria-expanded="false" onclick="toggleFieldPanel(this)">Image example</button>
+    <div class="field-panel-body scene-image-body">
+      <label for="sceneImageUrl${idx}" class="scene-image-label">Paste an image URL</label>
+      <input id="sceneImageUrl${idx}" type="url" class="field-input" placeholder="https://example.com/image.jpg" oninput="setSceneImageUrl(${idx}, this)" onkeydown="if(event.key==='Enter' && !event.isComposing){event.preventDefault();searchByForm();}">
+      <label class="scene-image-upload" for="sceneImageFile${idx}"><i class="fa fa-upload" aria-hidden="true"></i> Upload image
+        <input id="sceneImageFile${idx}" type="file" accept="image/*" onchange="uploadSceneImage(${idx}, this)">
+      </label>
+      <div id="sceneImageStatus${idx}" class="scene-image-status" role="status" aria-live="polite"></div>
+      <div id="sceneImagePreview${idx}" class="scene-image-preview" hidden>
+        <img id="sceneImageThumb${idx}" alt="Image example for scene ${idx + 1}">
+        <button type="button" onclick="clearSceneImage(${idx})" aria-label="Remove image example" title="Remove image example"><i class="fa fa-times" aria-hidden="true"></i></button>
+      </div>
+    </div>
+  </div>`;
+}
+
 function toggleFieldPanel(btn) {
   if (typeof event !== "undefined" && event.target && event.target.closest(".field-clear-btn")) return;
   const panel = btn.closest(".field-panel");
   if (!panel) return;
+  const scene = panel.closest(".scene-card");
+  if (scene) {
+    const idx = Number(scene.dataset.sceneIdx);
+    const channel = sceneChannels.find(([key]) => panel.id === `panel_${key}${idx}`);
+    if (channel) {
+      setSceneChannel(idx, channel[0], panel.classList.contains("collapsed"));
+      document.getElementById(`channel_${channel[0]}${idx}`).focus();
+      return;
+    }
+  }
   panel.classList.toggle("collapsed");
   btn.setAttribute(
     "aria-expanded",
     panel.classList.contains("collapsed") ? "false" : "true",
   );
+}
+
+function toggleFieldMode(btn) {
+  const mode = btn.dataset.mode === "text" ? "vector" : "text";
+  const label = mode === "text" ? "Text" : "Vector";
+  btn.dataset.mode = mode;
+  btn.textContent = label;
+  btn.setAttribute("aria-label", `${btn.dataset.field.toUpperCase()} mode: ${label}`);
+  btn.title = `${label} mode. Click to switch to ${mode === "text" ? "Vector" : "Text"}.`;
 }
 
 function toggleFieldOperator(btn) {
@@ -32,6 +108,7 @@ function orderScenePanels(canvasID) {
 
   const panelOrder = [
     document.getElementById(`textual${canvasID}_container`),
+    document.getElementById(`panel_image${canvasID}`),
     document.getElementById(`panel_ocr${canvasID}`),
     document.getElementById(`panel_asr${canvasID}`),
     document.getElementById(`panel_rewrite${canvasID}`),
@@ -41,6 +118,7 @@ function orderScenePanels(canvasID) {
   ];
 
   panelOrder.forEach((panel) => panel && scene.appendChild(panel));
+  sceneChannels.forEach(([channel]) => setSceneChannel(canvasID, channel, false));
   const modelOptions = document.getElementById(`textualOptions${canvasID}`);
   const modelMenu = document.getElementById("utilityModelOptions");
   if (modelOptions && modelMenu) {
@@ -116,15 +194,15 @@ const searchForm = (
 	<div class="scene-card scene${canvasID % 5}" id="canvasTab${canvasID}" data-scene-idx="${canvasID}">
 		<div class="scene-card-header">
 			<div class="font-large font-bold scene-title-row">
-				<i id="sceneDes${canvasID}" class="${css_class}"> ${title}</i>
+				<span id="sceneDes${canvasID}" class="scene-number ${css_class}" title="${title}" aria-label="Scene ${canvasID + 1}">${canvasID + 1}</span>
 				<div class="scene-actions">
-					<button type="button" id="clean${canvasID}" class="scene-action-btn scene-clean-btn" title="Clean entire scene">
-						<i class="fa fa-trash"></i>
+					<button type="button" id="clean${canvasID}" class="scene-action-btn scene-clean-btn" title="Clean entire scene" aria-label="Clear scene ${canvasID + 1}">
+						<i class="fa fa-trash" aria-hidden="true"></i>
 					</button>
-					<button type="button" id="undo${canvasID}" class="scene-action-btn scene-undo-btn" title="Undo scene clean">
-						<i class="fa fa-undo"></i>
+					<button type="button" id="undo${canvasID}" class="scene-action-btn scene-undo-btn" title="Undo scene clean" aria-label="Undo clear scene ${canvasID + 1}">
+						<i class="fa fa-undo" aria-hidden="true"></i>
 					</button>
-					<button type="button" class="scene-remove-btn" id="removeScene${canvasID}" title="Remove this temporal scene"
+					<button type="button" class="scene-remove-btn" id="removeScene${canvasID}" title="Remove this temporal scene" aria-label="Remove scene ${canvasID + 1}"
 						onclick="removeLastSearchScene(); return false;" style="display:none;">
 						<i class="fa fa-times"></i>
 					</button>
@@ -132,6 +210,8 @@ const searchForm = (
 			</div>
 		</div>
 
+    ${sceneChannelToolbar(canvasID)}
+    ${sceneImagePanel(canvasID)}
 		<div class="textualOptions${canvasID} mode-row compact-mode-picker" id="textualOptions${canvasID}">
 			${modesHtml}
 		</div>
@@ -226,18 +306,11 @@ const searchForm = (
 				</div>
 			</div>
 
-			<div class="field-panel" id="panel_ocr${canvasID}">
-				<button type="button" class="field-panel-toggle" aria-expanded="true" onclick="toggleFieldPanel(this)">OCR</button>
+			<div class="field-panel transcript-panel" id="panel_ocr${canvasID}">
 				<div class="field-panel-body">
 					<div class="mode-row asr-modes compact-mode-picker fuzziness-mode-row">
-						<label class="mode-chip">
-							<input type="radio" name="ocrMode${canvasID}" value="text" checked>
-							<span>Text</span>
-						</label>
-						<label class="mode-chip">
-							<input type="radio" name="ocrMode${canvasID}" value="vector">
-							<span>Vector</span>
-						</label>
+            <button type="button" class="field-panel-toggle transcript-label" aria-expanded="true" title="Collapse OCR" onclick="toggleFieldPanel(this)">OCR</button>
+            <button type="button" id="ocrMode${canvasID}" class="field-operator-toggle field-mode-toggle" data-field="ocr" data-mode="text" aria-label="OCR mode: Text" title="Text mode. Click to switch to Vector." onclick="toggleFieldMode(this)">Text</button>
 						<button type="button" id="ocrOperator${canvasID}" class="field-operator-toggle"
 							data-field="ocr" data-operator="or" aria-label="OCR operator: OR"
 							title="OCR operator: OR. Click to switch." onclick="toggleFieldOperator(this)">OR</button>
@@ -261,18 +334,11 @@ const searchForm = (
 				</div>
 			</div>
 
-			<div class="field-panel" id="panel_asr${canvasID}">
-				<button type="button" class="field-panel-toggle" aria-expanded="true" onclick="toggleFieldPanel(this)">ASR</button>
+			<div class="field-panel transcript-panel" id="panel_asr${canvasID}">
 				<div class="field-panel-body">
 					<div class="mode-row asr-modes compact-mode-picker fuzziness-mode-row">
-						<label class="mode-chip">
-							<input type="radio" name="asrMode${canvasID}" value="text" checked>
-							<span>Text</span>
-						</label>
-						<label class="mode-chip">
-							<input type="radio" name="asrMode${canvasID}" value="vector">
-							<span>Vector</span>
-						</label>
+            <button type="button" class="field-panel-toggle transcript-label" aria-expanded="true" title="Collapse ASR" onclick="toggleFieldPanel(this)">ASR</button>
+            <button type="button" id="asrMode${canvasID}" class="field-operator-toggle field-mode-toggle" data-field="asr" data-mode="text" aria-label="ASR mode: Text" title="Text mode. Click to switch to Vector." onclick="toggleFieldMode(this)">Text</button>
 						<button type="button" id="asrOperator${canvasID}" class="field-operator-toggle"
 							data-field="asr" data-operator="or" aria-label="ASR operator: OR"
 							title="ASR operator: OR. Click to switch." onclick="toggleFieldOperator(this)">OR</button>

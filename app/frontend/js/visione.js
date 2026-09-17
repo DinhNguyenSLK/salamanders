@@ -1368,6 +1368,8 @@ function getFuzzinessParameter(field, idx) {
 function cell2Text(idx) {
   // Builds one QueryItems + ParamItems pair (schemas/_request.py) for scene idx.
   let queryObj = {};
+  const sceneImage = getSceneImage(idx);
+  if (sceneImage) queryObj.qbe = sceneImage;
   let queryParameters = {
     textual_model: textualMode[idx] || "all",
     operator: occur[idx] || "and",
@@ -1390,7 +1392,7 @@ function cell2Text(idx) {
     if (ocr) {
       queryObj.ocr = ocr.toLowerCase();
       queryParameters.ocr_mode =
-        $('input[name="ocrMode' + idx + '"]:checked').val() || "text";
+        $("#ocrMode" + idx).attr("data-mode") || "text";
       queryParameters.ocr_fuzziness = getFuzzinessParameter("ocr", idx);
     }
   }
@@ -1401,7 +1403,7 @@ function cell2Text(idx) {
     if (asr) {
       queryObj.asr = asr.toLowerCase();
       queryParameters.asr_mode =
-        $('input[name="asrMode' + idx + '"]:checked').val() || "text";
+        $("#asrMode" + idx).attr("data-mode") || "text";
       queryParameters.asr_fuzziness = getFuzzinessParameter("asr", idx);
     }
   }
@@ -1538,6 +1540,17 @@ function searchByLink(queryID) {
 }
 
 function searchByForm() {
+  for (let idx = 0; idx < tempSearchForms; idx++) {
+    const panel = document.getElementById(`panel_image${idx}`);
+    const url = document.getElementById(`sceneImageUrl${idx}`);
+    if (panel && (panel._imagePending || (url.value.trim() && !getSceneImage(idx)))) {
+      setSceneChannel(idx, "image", true, true);
+      document.getElementById(`sceneImageStatus${idx}`).textContent = panel._imagePending
+        ? "Please wait for the image to finish loading."
+        : "Enter a complete http or https image URL, or clear the field.";
+      return;
+    }
+  }
   const utilityFilter = document.querySelector(".utility-filter");
   if (utilityFilter) utilityFilter.open = false;
   // Một request duy nhất cho toàn bộ temporal scenes — không gọi API từng scene.
@@ -2929,6 +2942,7 @@ function includeHTML(timeoutMs = 8000) {
   });
 }
 function sceneHasContent(idx) {
+  if (getSceneImage(idx) || document.getElementById(`sceneImageUrl${idx}`)?.value || document.getElementById(`panel_image${idx}`)?._imagePending) return true;
   const fields = ["textual", "not", "ocr", "asr", "tags"];
   for (let i = 0; i < fields.length; i++) {
     if (($("#" + fields[i] + idx).val() || "").trim()) return true;
@@ -2943,6 +2957,12 @@ function sceneHasContent(idx) {
 }
 
 function sceneClean(idx) {
+  const imagePanel = document.getElementById(`panel_image${idx}`);
+  if (imagePanel) {
+    imagePanel._previousImage = getSceneImage(idx);
+    imagePanel._previousUrl = document.getElementById(`sceneImageUrl${idx}`).value;
+    clearSceneImage(idx);
+  }
   prevTextual[idx] = $("#textual" + idx).val() || "";
   $("#textual" + idx).val("");
   const cancelText = document.getElementById("cancelText" + idx);
@@ -3031,6 +3051,13 @@ function undoReset() {
 }
 
 function sceneCleanUndo(idx) {
+  const imagePanel = document.getElementById(`panel_image${idx}`);
+  if (imagePanel) {
+    clearSceneImage(idx);
+    renderSceneImage(idx, imagePanel._previousImage || "");
+    document.getElementById(`sceneImageUrl${idx}`).value = imagePanel._previousUrl || "";
+    if (imagePanel._previousImage || imagePanel._previousUrl) setSceneChannel(idx, "image", true);
+  }
   const textualVal = prevTextual[idx] || "";
   $("#textual" + idx).val(textualVal);
   const cancelText = document.getElementById("cancelText" + idx);

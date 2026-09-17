@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="css/jquery-ui.min.css" />
     <link rel="stylesheet" href="css/fontawesome.min.css" />
     <link rel="stylesheet" href="css/bootstrap.css" />
-    <link rel="stylesheet" href="css/visione.css?v=95" />
+    <link rel="stylesheet" href="css/visione.css?v=102" />
     <link rel="stylesheet" href="css/customSubmission.css?v=1" />
     <link rel="stylesheet" href="css/queryByExample.css?v=11" />
     <link rel="stylesheet" href="css/toggle.css" />
@@ -157,14 +157,9 @@
             </div>
             <div class="sidebar-scroll">
               <div id="searchTab"></div>
-              <div
-                id="qbe"
-                w3-include-html="filters.html?v=9"
-                class="font-normal"
-              ></div>
             </div>
             <div class="qbe-search-fixed">
-              <button type="button" id="queryByExample" class="qbe-search-btn" title="Search" onclick="queryImg(); return false;">
+              <button type="button" id="queryByExample" class="qbe-search-btn" title="Search all scenes" onclick="searchByForm(); return false;">
                 <i class="fa fa-search"></i> Search
               </button>
             </div>
@@ -338,12 +333,12 @@
     <script src="js/jquery-ui.min.js"></script>
     <script src="js/fabric.js"></script>
     <script src="js/js-yaml.min.js"></script>
-    <script src="js/queryByExample.js?v=5"></script>
-    <script src="js/visione.js?v=44"></script>
+    <script src="js/queryByExample.js?v=6"></script>
+    <script src="js/visione.js?v=46"></script>
     <script src="js/visioneAVS.js?v=13"></script>
     <script src="js/customSubmission.js?v=1"></script>
     <script src="js/canvas.js?v=6"></script>
-    <script src="js/search_bar_templates.js?v=21"></script>
+    <script src="js/search_bar_templates.js?v=26"></script>
     <script>
       init().catch(function (err) {
         console.error("init failed:", err);

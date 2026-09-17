@@ -1,3 +1,76 @@
+// Store examples on their scene nodes so removing/recreating a scene resets its state.
+function getSceneImage(idx) {
+	return document.getElementById(`panel_image${idx}`)?.dataset.image || "";
+}
+
+function renderSceneImage(idx, source) {
+	const panel = document.getElementById(`panel_image${idx}`);
+	if (!panel) return;
+	panel.dataset.image = source;
+	const preview = document.getElementById(`sceneImagePreview${idx}`);
+	const image = document.getElementById(`sceneImageThumb${idx}`);
+	preview.hidden = !source;
+	if (source) image.src = source;
+	else image.removeAttribute("src");
+	document.getElementById(`channel_image${idx}`).classList.toggle("has-value", Boolean(source));
+}
+
+function clearSceneImage(idx) {
+	const panel = document.getElementById(`panel_image${idx}`);
+	if (!panel) return;
+	panel._imageReadToken = {};
+	panel._imagePending = false;
+	document.getElementById(`sceneImageUrl${idx}`).value = "";
+	document.getElementById(`sceneImageFile${idx}`).value = "";
+	document.getElementById(`sceneImageStatus${idx}`).textContent = "";
+	renderSceneImage(idx, "");
+	isCanvasClean[idx] = false;
+}
+
+function setSceneImageUrl(idx, input) {
+	const value = input.value;
+	clearSceneImage(idx);
+	input.value = value;
+	const source = value.trim();
+	if (!source) return;
+	try {
+		const url = new URL(source);
+		if (!["https:", "http:"].includes(url.protocol)) throw new Error("Invalid protocol");
+		renderSceneImage(idx, source);
+	} catch (_) {
+		document.getElementById(`sceneImageStatus${idx}`).textContent = "Enter a complete http or https image URL.";
+	}
+}
+
+function uploadSceneImage(idx, input) {
+	const file = input.files && input.files[0];
+	if (!file) return;
+	const panel = document.getElementById(`panel_image${idx}`);
+	const status = document.getElementById(`sceneImageStatus${idx}`);
+	if (!file.type.startsWith("image/")) {
+		status.textContent = "Choose an image file.";
+		input.value = "";
+		return;
+	}
+	clearSceneImage(idx);
+	const token = panel._imageReadToken;
+	panel._imagePending = true;
+	status.textContent = "Reading image…";
+	const reader = new FileReader();
+	reader.onload = () => {
+		if (!panel.isConnected || token !== panel._imageReadToken) return;
+		panel._imagePending = false;
+		renderSceneImage(idx, reader.result);
+		status.textContent = file.name;
+	};
+	reader.onerror = () => {
+		if (!panel.isConnected || token !== panel._imageReadToken) return;
+		panel._imagePending = false;
+		status.textContent = "Could not read this image. Please try again.";
+	};
+	reader.readAsDataURL(file);
+}
+
 function changeQueryBySampleMod(mode) {
 	const urlInput = document.getElementById("urlToUpload");
 	const fileLabel = document.getElementById("imageToUploadLabel");
