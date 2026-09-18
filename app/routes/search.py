@@ -13,23 +13,24 @@ router = APIRouter(
     tags=["ElasticSearch", "FaissSearch"],
 )
 
-_video_type_cache: dict[str, set[str]] = {}
 
-async def get_video_type_filter(es_client, index_name, video_type):
-    if video_type == "all":
-        return None
+# _video_type_cache: dict[str, set[str]] = {}
 
-    if video_type not in _video_type_cache:
-        _video_type_cache[video_type] = await _videotype_filter(
-            es_client,
-            index_name,
-            {
-                "field": "video_type",
-                "value": video_type,
-            },
-        )
+# async def get_video_type_filter(es_client, index_name, video_type):
+#     if video_type == "all":
+#         return None
 
-    return _video_type_cache[video_type]
+#     if video_type not in _video_type_cache:
+#         _video_type_cache[video_type] = await _videotype_filter(
+#             es_client,
+#             index_name,
+#             {
+#                 "field": "video_type",
+#                 "value": video_type,
+#             },
+#         )
+
+#     return _video_type_cache[video_type]
 
 
 # def load_video_filter(
@@ -64,18 +65,19 @@ async def search(
     k = queries.params.k
     n_frames_per_round = queries.params.n_frames_per_round
     rearrange = queries.params.rearrange
+    video_type = queries.params.video_type
 
-    video_type_filter = await get_video_type_filter(
-        es_client,
-        index_name,
-        queries.params.video_type,
-    )
+    # video_type_filter = await get_video_type_filter(
+    #     es_client,
+    #     index_name,
+    #     queries.params.video_type,
+    # )
 
     e1 = time.time()
     print(f'thời gian từ đầu đến filter {e1-start_time}')
 
-    if video_type_filter is not None:
-        print(f"Len {queries.params.video_type} = {len(video_type_filter)}")
+    # if video_type_filter is not None:
+    #     print(f"Len {queries.params.video_type} = {len(video_type_filter)}")
 
     all_results = []
     
@@ -84,7 +86,7 @@ async def search(
         queryObj = queries.get(tab)
 
         # FILTER PART
-        filter_results = [video_type_filter] if video_type_filter else []
+        filter_results = []
         
         if queryObj.get("object_count"):
             objcount_query = queryObj.parseObjCount()
@@ -171,7 +173,7 @@ async def search(
         # FINAL LOGIC
         merged_results = _merge(tab_results)
        
-        filtered_results = _filter(merged_results, pre_filter_results)
+        filtered_results = _filter(merged_results, pre_filter_results, video_type)
         
         all_results.append(filtered_results)
 
