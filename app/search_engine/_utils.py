@@ -2,10 +2,26 @@
 from schemas import SearchResult
 from collections import defaultdict
 
-def _filter(results: list[SearchResult], pre_filter_results: set):
+def _filter(results: list[SearchResult], pre_filter_results: set, video_type: str):
+
+    video_type_rule = {
+    "L21": "news",
+    "L22": "news",
+    "L23": "cycling",
+    "L24": "dance",
+    "L25": "lecture",
+    "L26": "cooking",
+    "L27": "lifelog",
+    "L28": "lifelog",
+    "L29": "lifelog",
+    "L30": "lifelog"
+}   
+    if video_type != "all":
+        results = [result for result in results if  video_type_rule.get(result.imgId.split("_")[0]) == video_type]
 
     if pre_filter_results is None:
         return results
+    
     print(f'Len results in filter {len(results)}')
     if len(results) == 0:      # Gỉa định trả về kết quả nếu người dùng chỉ filter
         return [SearchResult(
