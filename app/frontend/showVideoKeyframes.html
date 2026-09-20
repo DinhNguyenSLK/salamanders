@@ -32,10 +32,10 @@
 		body.page-keyframes #keyframes .row {
 			display: flex;
 			flex-wrap: wrap;
-			gap: 10px;
+			gap: 2px;
 			justify-content: center;
 			margin: 0;
-			padding: 5px 0;
+			padding: 1px 0;
 		}
 		body.page-keyframes > table {
 			width: 100%;
@@ -78,17 +78,19 @@
 			text-decoration: none;
 		}
 		#keyframes .result-border {
+			flex: 0 0 218px;
+			width: 218px;
 			background: rgba(255, 253, 249, 0.96);
 			border: 1px solid #dec7a5 !important;
 			border-radius: 12px;
 			box-shadow: 0 4px 12px rgba(76, 52, 29, 0.1);
 			margin: 0 !important;
-			padding: 5px !important;
+			padding: 1px !important;
 			transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
 		}
 		#keyframes .result-border:not(.selected-keyframe-card) {
 			content-visibility: auto;
-			contain-intrinsic-size: 250px 162px;
+			contain-intrinsic-size: auto 214px auto 132px;
 		}
 		#keyframes .result-border:hover {
 			border-color: #b8894d !important;
@@ -97,7 +99,7 @@
 		}
 		#keyframes .selected-keyframe-card {
 			background: #fffafa;
-			border: 3px solid #dc2626 !important;
+			border: 1px solid #dc2626 !important;
 			box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.32), 0 0 24px 8px rgba(220, 38, 38, 0.46), 0 12px 28px rgba(127, 29, 29, 0.34);
 			position: relative;
 		}
@@ -107,14 +109,14 @@
 		}
 		#keyframes .selected-keyframe-card::before {
 			background: #dc2626;
-			border-radius: 0 0 0 6px;
+			border-radius: 0 0 6px 0;
 			color: #fff;
 			content: "Selected";
 			font-size: 11px;
 			font-weight: 700;
 			padding: 3px 7px;
 			position: absolute;
-			right: 0;
+			left: 0;
 			top: 0;
 			z-index: 1;
 		}
@@ -131,22 +133,36 @@
 			border-radius: 8px;
 			display: block;
 			max-width: 100%;
+			width: 214px;
+			height: 120px;
 			object-fit: cover;
 		}
 		.keyframe-toolbar {
-			align-items: center;
-			display: flex;
-			gap: 5px;
-			min-height: 31px;
-			padding: 5px 1px 0;
+			inset: 0;
+			opacity: 0;
+			pointer-events: none;
+			position: absolute;
+			transition: opacity 120ms ease;
+			z-index: 4;
+		}
+		.keyframe-image-wrapper:hover .keyframe-toolbar,
+		.keyframe-image-wrapper:focus-within .keyframe-toolbar {
+			opacity: 1;
+		}
+		.keyframe-image-wrapper:hover .keyframe-action,
+		.keyframe-image-wrapper:focus-within .keyframe-action {
+			pointer-events: auto;
 		}
 		.keyframe-frame-id {
 			color: #73502e;
-			flex: 1 1 auto;
-			font-size: 11px;
-			font-weight: 700;
-			max-width: 130px;
+			display: block;
+			font-size: 10px;
+			font-weight: 600;
+			line-height: 12px;
+			width: 100%;
 			overflow: hidden;
+			padding: 0 2px;
+			text-align: center;
 			text-decoration: none;
 			text-overflow: ellipsis;
 			white-space: nowrap;
@@ -159,19 +175,22 @@
 		}
 		.keyframe-action {
 			align-items: center;
-			background: #fff;
-			border: 1px solid #d9c7b0;
+			background: rgba(255, 253, 248, 0.76);
+			backdrop-filter: blur(6px);
+			-webkit-backdrop-filter: blur(6px);
+			border: 1px solid rgba(255, 255, 255, 0.8);
 			border-radius: 50%;
-			box-shadow: 0 1px 3px rgba(69, 47, 28, 0.12);
+			box-shadow: 0 1px 4px #0004;
 			cursor: pointer;
 			display: inline-flex;
-			flex: 0 0 27px;
-			font-size: 12px;
-			height: 27px;
+			font-size: 11px;
+			height: 24px;
 			justify-content: center;
 			padding: 0;
+			pointer-events: none;
+			position: absolute;
 			transition: background-color 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease, transform 0.14s ease;
-			width: 27px;
+			width: 24px;
 		}
 		.keyframe-action:hover,
 		.keyframe-action:focus-visible {
@@ -180,6 +199,8 @@
 			transform: translateY(-1px);
 		}
 		.keyframe-action-video {
+			bottom: 4px;
+			right: 4px;
 			color: #2563a9;
 		}
 		.keyframe-action-video:hover,
@@ -188,6 +209,8 @@
 			border-color: #79a9dc;
 		}
 		.keyframe-action-similarity {
+			bottom: 4px;
+			left: 4px;
 			color: #815a2e;
 		}
 		.keyframe-action-similarity:hover,
@@ -196,6 +219,8 @@
 			border-color: #c59961;
 		}
 		.keyframe-action-submit {
+			top: 4px;
+			right: 4px;
 			color: #18843b;
 		}
 		.keyframe-action-submit:hover,
@@ -294,6 +319,7 @@
 	<script src="js/js-yaml.min.js"></script>
 	<script src="js/visione.js?v=24"></script>
 	<script src="js/customSubmission.js?v=1"></script>
+	<script src="js/keyframeLoader.js?v=2"></script>
 </head>
 
 <body class="page-keyframes">
@@ -476,14 +502,12 @@
 				var selectedIndex = keyframes.findIndex(function (frameId) {
 					return normalizeKeyframeId(frameId) === selectedId;
 				});
-				var priorityRadius = 12;
 				var table = [];
 
 			for (var i = 0; i < keyframes.length; i++) {
 				var frameName = keyframes[i];
 				var path = videoId + "/" + frameName;
 				var isSelected = i === selectedIndex;
-				var selectedDistance = selectedIndex >= 0 ? Math.abs(i - selectedIndex) : Infinity;
 
 				if (i % 6 == 0) {
 					//table += "<div class='row' style='border-bottom: 3px dotted #808; padding:10px'>"
@@ -491,7 +515,7 @@
 				}
 
 				let imgAttrs = isSelected ?
-					`class="rounded videoSummarySelected keyframe-preview-trigger" id="${normalizeKeyframeId(frameName)}"` :
+					`class="rounded videoSummarySelected keyframe-preview-trigger"` :
 					`class="rounded keyframe-preview-trigger"`;
 				let cardClass = isSelected ?
 					"result-border selected-keyframe-card" : "result-border";
@@ -501,25 +525,14 @@
 				let timeTooltip = isFinite(milliseconds) ?
 					`Frame ${frameNumber} • ${milliseconds.toFixed(2)} ms` :
 					`Frame ${frameName}`;
-				let loadingAttrs = isSelected ?
-					`loading="eager" fetchpriority="high" decoding="async"` :
-					selectedDistance <= priorityRadius ?
-						`loading="eager" fetchpriority="auto" decoding="async"` :
-						`loading="lazy" fetchpriority="low" decoding="async"`;
-
-				// hack to replace .jpg with .png if the image is not found
-				// FIXME: remove it when all VISIONE instances will use pngs
-				let hack = `onerror="this.src = this.src.replace('.jpg', '.jpg')"`;
 
 				table.push(`
 				<!--<div class='col-2 with-margin'>-->
 				<div class="${cardClass}">
 
 					<div class="keyframe-image-wrapper" data-tooltip="${timeTooltip}">
-						<img ${loadingAttrs} id="${keyframes[i]}" height="120" src="${keyFramesUrl}${path}.jpg" ${hack} title="${timeTooltip}" ${imgAttrs} />
-					</div>
+						<img decoding="async" id="${normalizeKeyframeId(frameName)}" width="214" height="120" data-src="${keyFramesUrl}${path}.jpg" title="${timeTooltip}" ${imgAttrs} />
 					<div class="keyframe-toolbar">
-						<a class="keyframe-frame-id" href="indexedData.html?videoId=${videoId}&id=${keyframes[i]}" title="Show indexed data for ${keyframes[i]}" target="_blank">${keyframes[i]}</a>
 						<button type="button" class="keyframe-action keyframe-action-video" title="Play video" aria-label="Play video" onclick="playVideoWindow('${videoUrl}', '${videoId}', '${keyframes[i]}'); return false;">
 							<i class="fas fa-video" aria-hidden="true"></i>
 						</button>
@@ -530,6 +543,8 @@
 							<i class="fas fa-paper-plane" aria-hidden="true"></i>
 						</button>
 					</div>
+					</div>
+					<a class="keyframe-frame-id" href="indexedData.html?videoId=${videoId}&id=${keyframes[i]}" title="Show indexed data for ${keyframes[i]}" target="_blank">${keyframes[i]}</a>
 				</div>
 				`);
 
@@ -540,9 +555,8 @@
 
 			if (keyframes.length % 6 !== 0) table.push("</div>");
 			document.getElementById("keyframes").innerHTML = table.join("");
-			requestAnimationFrame(function () {
-				requestAnimationFrame(focusSelectedFrame);
-			});
+			focusSelectedFrame();
+			observeKeyframeImages(document.getElementById('keyframes'));
 			});
 		}
 

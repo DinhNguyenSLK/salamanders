@@ -541,6 +541,7 @@ function openResultLightbox(selectedItem) {
 		resultLightboxResultsScrollTop = resultsScroller ? resultsScroller.scrollTop : null;
 	}
 	resultLightboxItem = selectedItem;
+	markResultLightboxItemAsViewed(selectedItem);
 	modal.hidden = false;
 	document.body.classList.add("result-lightbox-open");
 	loadResultLightboxThumbnails(selectedItem);
@@ -553,13 +554,6 @@ function markResultLightboxItemAsViewed(selectedItem) {
 	if (!card) return;
 
 	card.classList.add("is-viewed");
-	if (card.querySelector(".result-viewed-badge")) return;
-
-	var badge = document.createElement("span");
-	badge.className = "result-viewed-badge";
-	badge.title = "Viewed: " + selectedItem.imgId;
-	badge.innerHTML = '<i class="fas fa-check" aria-hidden="true"></i><span>Viewed</span>';
-	card.appendChild(badge);
 }
 
 function markTopVideoResultAsViewed(link) {
@@ -811,8 +805,8 @@ function selectImg(selectedItem) {
 	if (selImgId != null) {
 		selImgId.style.borderWidth = "0";
 		selImgId.style.borderStyle = "none";
-		selImgId.style.outline = "3px solid #c47728";
-		selImgId.style.outlineOffset = "-3px";
+		selImgId.style.outline = "none";
+		selImgId.style.outlineOffset = "0";
 	}
 }
 

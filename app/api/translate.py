@@ -2,6 +2,7 @@ from deep_translator import GoogleTranslator
 from google.cloud import translate_v2 as translate
 from google.oauth2 import service_account
 import time
+from pathlib import Path
 
 def translate_free(text: str, source: str = 'vi', target: str = 'en'):
     
@@ -15,7 +16,7 @@ class Translator():
             self,
             source: str = "vi",
             target: str = "en",
-            KEY_FILE: str = r"G:\salamanders\app\api\google-translate.json"
+            KEY_FILE: str = str(Path(__file__).parent / "google-translate.json")
     ):
         self.source = source
         self.target = target

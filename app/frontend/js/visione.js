@@ -1366,6 +1366,8 @@ function getFuzzinessParameter(field, idx) {
 function cell2Text(idx) {
   // Builds one QueryItems + ParamItems pair (schemas/_request.py) for scene idx.
   let queryObj = {};
+  const reference = document.getElementById("historyReference" + idx);
+  if (reference) queryObj[reference.dataset.kind] = reference.dataset.value;
   const sceneImage = getSceneImage(idx);
   if (sceneImage) queryObj.qbe = sceneImage;
   let queryParameters = {
@@ -1669,6 +1671,7 @@ function search2(payload) {
     cancelBackgroundResultRendering();
     resultsRenderGeneration++;
     latestQuery = JSON.stringify(payload);
+    if (typeof recordSearchHistory === "function") recordSearchHistory(payload);
     console.log("POST /search/ scenes=" + payload.query.length, payload);
     const requestStartedAt = performance.now();
     setSearchLatency(null, "loading");
@@ -2137,9 +2140,11 @@ function loadImages(startIndex, endIndex) {
         videoId +
         "&id=" +
         imgId +
-        '" target="_blank" rel="opener" onclick="markTopVideoResultAsViewed(this)">' +
+        '" target="_blank" rel="opener" title="Open keyframes: ' +
         videoId +
-        "</a></div>" +
+        '" onclick="markTopVideoResultAsViewed(this)"><span class="sr-only">Open keyframes for video ' +
+        videoId +
+        "</span></a></div>" +
         '<div class="video-frames-scroll" data-videoid="' +
         videoId +
         '"></div>' +
@@ -2367,26 +2372,34 @@ function submitResult(id, videoId, textAnswer = null, isAsync = false) {
   }).responseText;
 }
 
-const KIS_SUBMIT_BASE_URL = "http://192.168.28.151:5000/api/v2/submit/";
+function getDresSettings() {
+  const dres = config?.dres || {};
+  return {
+    endpoint: String(dres.endpoint || "").trim().replace(/\/+$/, ""),
+    sessionId: String(dres.sessionID || "").trim(),
+    evaluationId: String(dres.evaluationID || "").trim(),
+  };
+}
+
+function getDresSubmitUrl() {
+  const { endpoint, sessionId, evaluationId } = getDresSettings();
+  if (!endpoint || !sessionId || !evaluationId) {
+    throw new Error(
+      "Configure dres.endpoint, dres.sessionID and dres.evaluationID in frontend/config.yaml before submitting.",
+    );
+  }
+  return endpoint + "/api/v2/submit/" + encodeURIComponent(evaluationId) +
+    "?session=" + encodeURIComponent(sessionId);
+}
 
 function openSubmitSettings() {
+  const { sessionId, evaluationId } = getDresSettings();
   if (!document.getElementById("submitSettingsModal")) {
-    const sessionId = prompt(
-      "KIS session ID",
-      localStorage.getItem("kisSessionId") || "",
-    );
-    if (sessionId === null) return;
-    const evaluationId = prompt(
-      "KIS evaluation ID",
-      localStorage.getItem("kisEvaluationId") || "",
-    );
-    if (evaluationId === null) return;
-    localStorage.setItem("kisSessionId", sessionId.trim());
-    localStorage.setItem("kisEvaluationId", evaluationId.trim());
+    alert("Session ID: " + sessionId + "\nEvaluation ID: " + evaluationId);
     return;
   }
-  $("#submitSessionId").val(localStorage.getItem("kisSessionId") || "");
-  $("#submitEvaluationId").val(localStorage.getItem("kisEvaluationId") || "");
+  $("#submitSessionId").val(sessionId);
+  $("#submitEvaluationId").val(evaluationId);
   $("#submitSettingsModal").prop("hidden", false);
 }
 
@@ -2406,11 +2419,6 @@ function closeUserInfo() {
 }
 
 function saveSubmitSettings() {
-  localStorage.setItem("kisSessionId", $("#submitSessionId").val().trim());
-  localStorage.setItem(
-    "kisEvaluationId",
-    $("#submitEvaluationId").val().trim(),
-  );
   closeSubmitSettings();
 }
 
@@ -2434,39 +2442,31 @@ function getFrameTimestampMs(frameId, videoId) {
 }
 
 function submitKISFrame(frameId, videoId) {
-  const sessionId = localStorage.getItem("kisSessionId") || "";
-  const evaluationId = localStorage.getItem("kisEvaluationId") || "";
-
-  if (!sessionId || !evaluationId) {
-    alert("Please configure session ID and evaluation ID first.");
-    openSubmitSettings();
-    return Promise.reject(new Error("Missing KIS submit settings"));
-  }
   try {
     const timestampMs = getFrameTimestampMs(frameId, videoId);
     return submitKISValues(
       videoId,
       timestampMs,
       timestampMs,
-      sessionId,
-      evaluationId,
     );
   } catch (error) {
     return Promise.reject(error);
   }
 }
 
-function submitKISValues(videoId, startMs, endMs, sessionId, evaluationId) {
-  sessionId = sessionId || localStorage.getItem("kisSessionId") || "";
-  evaluationId = evaluationId || localStorage.getItem("kisEvaluationId") || "";
+function submitKISValues(videoId, startMs, endMs) {
+  let url;
+  try {
+    url = getDresSubmitUrl();
+  } catch (error) {
+    return Promise.reject(error);
+  }
   const payload = {
     answerSets: [
       { answers: [{ mediaItemName: videoId, start: startMs, end: endMs }] },
     ],
   };
-  const url = KIS_SUBMIT_BASE_URL + encodeURIComponent(evaluationId);
-
-  return fetch(url + "?session=" + encodeURIComponent(sessionId), {
+  return fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -2490,15 +2490,10 @@ function formatDresServerResponse(response, body) {
 }
 
 function submitQAFrame(frameId, videoId) {
-  const sessionId = localStorage.getItem("kisSessionId") || "";
-  const evaluationId = localStorage.getItem("kisEvaluationId") || "";
-  if (!sessionId || !evaluationId) {
-    alert("Please configure session ID and evaluation ID first.");
-    openSubmitSettings();
-    return Promise.reject(new Error("Missing QA submit settings"));
-  }
+  let url;
   let timestampMs;
   try {
+    url = getDresSubmitUrl();
     timestampMs = getFrameTimestampMs(frameId, videoId);
   } catch (error) {
     return Promise.reject(error);
@@ -2509,8 +2504,7 @@ function submitQAFrame(frameId, videoId) {
     const payload = {
       answerSets: [{ answers: [{ text: text }] }],
     };
-    const url = KIS_SUBMIT_BASE_URL + encodeURIComponent(evaluationId);
-    return fetch(url + "?session=" + encodeURIComponent(sessionId), {
+    return fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -2950,6 +2944,7 @@ function sceneHasContent(idx) {
 }
 
 function sceneClean(idx) {
+  document.getElementById("historyReference" + idx)?.remove();
   const imagePanel = document.getElementById(`panel_image${idx}`);
   if (imagePanel) {
     imagePanel._previousImage = getSceneImage(idx);
@@ -3664,6 +3659,7 @@ async function init() {
   initVideoTypeAndK();
   loadPalette();
   initSearchScenes();
+  initSearchHistory();
   document.getElementById("avsSubmittedTab").style.display = "block";
 
   $("#resultsContent").on("dragover", allowCanvasDrop);

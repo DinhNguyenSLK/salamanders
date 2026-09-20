@@ -1,10 +1,13 @@
 
 ui:
-  # Display name of the current user.
+  # ĐỔI TÊN THÀNH VIÊN
   user-name: "dinhnv"
 
   # Maximum number of results per video to display in a row.
-  max-results-per-video: 12
+  max-results-per-video: 10
+
+  # Maximum recent searches saved in this browser (0 disables history).
+  top-record: 5
 
   # Top-k results requested from the backend (slider bounds / default).
   k: 1000
@@ -83,14 +86,11 @@ ui:
       - { name: white }
       - { name: yellow }
 
-# This section contains the configuration for the DRES submission service
-# (https://github.com/dres-dev/DRES) when VISIONE is used as a DRES client. It
-# is used only during competitions and is not needed for normal VISIONE
-# operation.
+
 dres:
-  endpoint: http://router/dres # SUBMIT_SERVER=http://router/dres
-  username: visione # SUBMIT_USER
-  password: visione # SUBMIT_PWD
-  member_id: visione # MEMBER_ID
-  send_logs: false # SEND_LOG_TO_DRES
-  # SUBMIT_SERVICE=submit  (deprecated)
+
+  endpoint: http://171.244.37.116:18114          # ĐỔI DRES CỦA BTC
+
+  sessionID: 4bd28d9f-eaa2-477c-af6d-3f9c1e9b8771     # MỖI ACCOUNT ĐƯỢC CẤP 1 SESSIONID KHÔNG ĐỔI
+  
+  evaluationID:  378e7045-6389-4743-98f0-62fc6ff12a6c	    # MỖI BÀI THI THỬ CÓ 1 EVALUATIONID

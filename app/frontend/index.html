@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="css/jquery-ui.min.css" />
     <link rel="stylesheet" href="css/fontawesome.min.css" />
     <link rel="stylesheet" href="css/bootstrap.css" />
-    <link rel="stylesheet" href="css/visione.css?v=103" />
+    <link rel="stylesheet" href="css/visione.css?v=112" />
     <link rel="stylesheet" href="css/customSubmission.css?v=1" />
     <link rel="stylesheet" href="css/queryByExample.css?v=11" />
     <link rel="stylesheet" href="css/toggle.css" />
@@ -54,6 +54,14 @@
         <details class="utility-model">
           <summary class="utility-filter-btn utility-model-btn" title="Choose search model">Model</summary>
           <div id="utilityModelOptions" class="utility-model-options" aria-label="Search models by scene"></div>
+        </details>
+        <details id="searchHistory" class="utility-model utility-history">
+          <summary class="utility-filter-btn utility-model-btn" title="Restore a recent search"><i class="fa fa-history" aria-hidden="true"></i> History <span id="searchHistoryCount" class="history-count">0</span></summary>
+          <div class="utility-model-options history-panel">
+            <div class="history-header"><strong>Recent searches</strong><button type="button" id="clearSearchHistory">Clear all</button></div>
+            <p id="searchHistoryHint" class="history-hint" role="status">Select a search to restore its fields.</p>
+            <div id="searchHistoryList"></div>
+          </div>
         </details>
         <details class="utility-filter">
           <summary class="utility-filter-btn" title="Search filters" aria-label="Search filters">
@@ -98,8 +106,8 @@
           <span id="submitSettingsTitle">Submit settings</span>
           <button type="button" class="submit-settings-close" onclick="closeSubmitSettings()" aria-label="Close">&times;</button>
         </div>
-        <label>Session ID<input id="submitSessionId" type="text" autocomplete="off"></label>
-        <label>Evaluation ID<input id="submitEvaluationId" type="text" autocomplete="off"></label>
+        <label>Session ID<input id="submitSessionId" type="text" autocomplete="off" readonly></label>
+        <label>Evaluation ID<input id="submitEvaluationId" type="text" autocomplete="off" readonly></label>
         <div class="submit-settings-actions">
           <button type="button" onclick="closeSubmitSettings()">Cancel</button>
           <button type="button" class="submit-settings-save" onclick="saveSubmitSettings()">Save</button>
@@ -335,11 +343,12 @@
     <script src="js/fabric.js"></script>
     <script src="js/js-yaml.min.js"></script>
     <script src="js/queryByExample.js?v=6"></script>
-    <script src="js/visione.js?v=46"></script>
-    <script src="js/visioneAVS.js?v=13"></script>
+    <script src="js/visione.js?v=48"></script>
+    <script src="js/visioneAVS.js?v=15"></script>
     <script src="js/customSubmission.js?v=1"></script>
     <script src="js/canvas.js?v=6"></script>
     <script src="js/search_bar_templates.js?v=26"></script>
+    <script src="js/searchHistory.js?v=1"></script>
     <script>
       init().catch(function (err) {
         console.error("init failed:", err);

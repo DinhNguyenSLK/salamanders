@@ -6,13 +6,14 @@ from typing import Annotated
 from config import settings
 from search_engine import TextSearchFactory, APIVectorSearch, _videotype_filter, _objectcount_filter
 from search_engine._utils import _filter, _temporal, _slice, _merge
+from cache.memory_cache import MemoryCache
+
 import time
 
 router = APIRouter(
     prefix="/search",
     tags=["ElasticSearch", "FaissSearch"],
 )
-
 
 # _video_type_cache: dict[str, set[str]] = {}
 
@@ -46,11 +47,9 @@ router = APIRouter(
 #         )
 
 index_name = settings.ES_INDEX
-
 vector_search = APIVectorSearch()
-# e = time.time()
-# load_video_filter(index_name)
-# print(f'Thời gian load xong filter {time.time()- e}')
+
+MEMORY_CACHE = MemoryCache()
 
 @router.post("/", response_model=list[SearchResult])
 async def search(
@@ -90,6 +89,7 @@ async def search(
         
         if queryObj.get("object_count"):
             objcount_query = queryObj.parseObjCount()
+        
             objcount_results = await _objectcount_filter(es_client, index_name, objcount_query)
             filter_results.append(objcount_results)
 
@@ -104,8 +104,24 @@ async def search(
         # Visual Similarity Part
         if queryObj.get("vf"):
             vf_query = queryObj.parseVf()
-            results = vector_search.search("vf", vf_query, k)
-            filtered_results = _filter(results, pre_filter_results)
+
+            cache_result =  MEMORY_CACHE.get(field= "vf", content= vf_query["imgId"], top_k=k)
+            results = None
+
+            if cache_result is not None:
+                print("kết quả đã tồn tại trong CACHE")
+                results = cache_result
+            else:
+                results = vector_search.search("vf", vf_query, k)
+
+                record = {
+                    "content": vf_query["imgId"],
+                    "results": results,
+                    "top_k": k
+                }
+                MEMORY_CACHE.set(field = "vf", record = record)
+
+            filtered_results = _filter(results, pre_filter_results, video_type)
             sliced_results = _slice(filtered_results, n_frames_per_round, False)
             return sliced_results
 
@@ -121,7 +137,26 @@ async def search(
         
         if queryObj.get("textual"):
             textual_query = queryObj.parseTextual()
-            results = vector_search.search("textual", textual_query, k)
+
+            cache_result =  MEMORY_CACHE.get(field= "textual", content= textual_query["textual"], mode= textual_query["mode"], top_k=k)
+            results = None
+
+            if cache_result is not None:
+                print("kết quả đã tồn tại trong CACHE")
+                results = cache_result
+            else:
+                record = {"content": textual_query["textual"]}
+
+                results = vector_search.search("textual", textual_query, k)
+
+                record.update({
+                    "results": results,
+                    "mode": textual_query["mode"],
+                    "top_k": k,
+                })
+
+                MEMORY_CACHE.set(field= "textual", record=record)
+
             tab_results["textual"] = results
 
         e1 = time.time()
@@ -137,11 +172,31 @@ async def search(
         if queryObj.get("ocr"):
 
             if queryObj.get_mode('ocr_mode') == "text":
-
+                
                 print("OCR MODE: TEXT")
                 ocr_query = queryObj.parseOcr()
-                template = TextSearchFactory.create("match", es_client, index_name)
-                results = await template.search(ocr_query, k)
+
+                cache_result =  MEMORY_CACHE.get(field= "ocr", content= ocr_query["value"], mode= "text", top_k=k, fuzziness=ocr_query['fuzziness'], operator=ocr_query['operator'])
+                results = None
+
+                if cache_result is not None:
+                    print("kết quả đã tồn tại trong CACHE")
+                    results = cache_result
+                else:
+                    record = {"content": ocr_query["value"]}
+
+                    template = TextSearchFactory.create("match", es_client, index_name)
+                    results = await template.search(ocr_query, k)
+
+                    record.update({
+                            "results": results,
+                            "mode": "text",
+                            "top_k": k,
+                            "fuzziness": ocr_query["fuzziness"],
+                            "operator": ocr_query['operator']
+                        })
+                    
+                    MEMORY_CACHE.set(field= "ocr", record=record)
                 tab_results["ocr"] = results
 
             else:
@@ -154,8 +209,28 @@ async def search(
             if queryObj.get_mode('asr_mode') == "text":
                 print("ASR MODE: TEXT")
                 asr_query = queryObj.parseAsr()
-                template = TextSearchFactory.create("match", es_client, index_name)
-                results = await template.search(asr_query, k)
+
+                cache_result =  MEMORY_CACHE.get(field= "asr", content= asr_query["value"], mode= "text", top_k=k, fuzziness=asr_query['fuzziness'], operator=asr_query['operator'])
+                results = None
+
+                if cache_result is not None:
+                    print("kết quả đã tồn tại trong CACHE")
+                    results = cache_result
+                else:
+                    record = {"content": asr_query["value"]}
+
+                    template = TextSearchFactory.create("match", es_client, index_name)
+                    results = await template.search(asr_query, k)
+
+                    record.update({
+                            "results": results,
+                            "mode": "text",
+                            "top_k": k,
+                            "fuzziness": asr_query["fuzziness"],
+                            "operator": asr_query['operator']
+                        })
+                    MEMORY_CACHE.set(field= "asr", record=record)
+                    
                 tab_results["asr"] = results
             else:
                 print('No implement')
