@@ -389,13 +389,7 @@ function syncCanvasAliases() {
 }
 
 function ensureSceneState(idx) {
-  const defaultMode =
-    config &&
-    config.ui &&
-    config.ui["textual-modes"] &&
-    config.ui["textual-modes"][0]
-      ? config.ui["textual-modes"][0].mode
-      : "all";
+  const defaultMode = defaultTextualMode();
   while (textualMode.length <= idx) textualMode.push(defaultMode);
   while (occur.length <= idx) occur.push("and");
   while (isCanvasEnabled.length <= idx) isCanvasEnabled.push(true);
@@ -525,7 +519,6 @@ function removeLastSearchScene() {
   }
   syncCanvasAliases();
   refreshSceneChrome();
-  searchByForm();
 }
 
 function initSearchScenes() {
@@ -925,9 +918,9 @@ function applyRewriteToTextual(idx) {
 }
 
 function loadConfig() {
-  // Bust browser cache so ui.textual-modes renames (e.g. clip → openclip) show up.
+  // Load current configuration from the server without browser caching.
   const cacheBust = "v=" + Date.now();
-  const promise1 = fetchWithTimeout("config.yaml?" + cacheBust)
+  const promise1 = fetchWithTimeout("config.yaml?" + cacheBust, { cache: "no-store" })
     .then((response) => {
       if (!response.ok) throw new Error("config.yaml HTTP " + response.status);
       return response.text();
@@ -2418,10 +2411,6 @@ function closeUserInfo() {
   $("#userInfoModal").prop("hidden", true);
 }
 
-function saveSubmitSettings() {
-  closeSubmitSettings();
-}
-
 function getFrameIndexFromId(frameId) {
   const match = String(frameId || "").match(/-(\d+)(?:\.[^.]+)?$/);
   return match ? parseInt(match[1], 10) : NaN;
@@ -2957,21 +2946,7 @@ function sceneClean(idx) {
   if (cancelText) cancelText.style.display = "none";
 
   prevTextualMode[idx] = textualMode[idx];
-  const defaultMode =
-    config &&
-    config.ui &&
-    config.ui["textual-modes"] &&
-    config.ui["textual-modes"][0]
-      ? config.ui["textual-modes"][0].mode
-      : "all";
-  const hasAll =
-    config &&
-    config.ui &&
-    config.ui["textual-modes"] &&
-    config.ui["textual-modes"].some(function (m) {
-      return m.mode === "all";
-    });
-  const resetMode = hasAll ? "all" : defaultMode;
+  const resetMode = defaultTextualMode();
   textualMode[idx] = resetMode;
   const modeRadio = document.getElementById(
     "textualMode" + idx + "_" + resetMode,

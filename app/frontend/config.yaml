@@ -91,6 +91,12 @@ dres:
 
   endpoint: http://171.244.37.116:18114          # ĐỔI DRES CỦA BTC
 
-  sessionID: 4bd28d9f-eaa2-477c-af6d-3f9c1e9b8771     # MỖI ACCOUNT ĐƯỢC CẤP 1 SESSIONID KHÔNG ĐỔI
+  sessionID: Tq3pezEMiRSHfqcUAxfn0EC1BUCbaf8E   # MỖI ACCOUNT ĐƯỢC CẤP 1 SESSIONID KHÔNG ĐỔI
   
-  evaluationID:  378e7045-6389-4743-98f0-62fc6ff12a6c	    # MỖI BÀI THI THỬ CÓ 1 EVALUATIONID
+  evaluationID:  b6d2a12e-dc82-4212-a8c2-8d5715066e1a	  # MỖI BÀI THI THỬ CÓ 1 EVALUATIONID
+
+
+# Submission mode is read on page load; use DRES or CUSTOM.
+# CUSTOM query ZIP uploads remain in memory only until the page reloads.
+submission:
+  type: DRES

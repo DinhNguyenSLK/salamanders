@@ -3,72 +3,22 @@
 
   const DRES_TYPE = "DRES";
   const CUSTOM_TYPE = "CUSTOM";
-  const TYPE_STORAGE_KEY = "submissionType";
-  const QUERY_STORAGE_KEY = "customSubmissionQueries";
-  const ZIP_NAME_STORAGE_KEY = "customSubmissionZipName";
   const MAX_ZIP_BYTES = 5 * 1024 * 1024;
   const MAX_ZIP_ENTRIES = 500;
   const MAX_QUERY_BYTES = 256 * 1024;
   const MAX_TOTAL_QUERY_BYTES = 2 * 1024 * 1024;
 
   const originalOpenSubmitSettings = window.openSubmitSettings;
-  const originalSaveSubmitSettings = window.saveSubmitSettings;
   const originalSubmitVersion2 = window.submitVersion2;
 
-  let savedQueries = readSavedQueries();
-  let savedZipName = readStoredValue(ZIP_NAME_STORAGE_KEY);
-  let draftQueries = [];
-  let draftZipName = "";
+  // Uploaded queries live only until this page is reloaded.
+  let queries = [];
+  let zipName = "";
   let zipIsLoading = false;
   let crc32Table = null;
 
-  if (savedQueries.length) persistSavedState();
-
-  function readStoredValue(key) {
-    try {
-      return localStorage.getItem(key) || sessionStorage.getItem(key) || "";
-    } catch (error) {
-      return "";
-    }
-  }
-
-  function readSavedQueries() {
-    try {
-      const serialized = localStorage.getItem(QUERY_STORAGE_KEY) ||
-        sessionStorage.getItem(QUERY_STORAGE_KEY) || "[]";
-      const parsed = JSON.parse(serialized);
-      if (!Array.isArray(parsed)) return [];
-      return parsed.filter(isValidQuery);
-    } catch (error) {
-      return [];
-    }
-  }
-
-  function persistSavedState() {
-    const serializedQueries = JSON.stringify(savedQueries);
-    try {
-      sessionStorage.setItem(QUERY_STORAGE_KEY, serializedQueries);
-      sessionStorage.setItem(ZIP_NAME_STORAGE_KEY, savedZipName);
-    } catch (error) {
-      console.warn("Cannot persist CUSTOM queries in this tab:", error);
-    }
-    try {
-      localStorage.setItem(QUERY_STORAGE_KEY, serializedQueries);
-      localStorage.setItem(ZIP_NAME_STORAGE_KEY, savedZipName);
-    } catch (error) {
-      console.warn("Cannot persist CUSTOM queries for cross-tab use:", error);
-    }
-  }
-
-  function isValidQuery(query) {
-    return query &&
-      typeof query.file_name === "string" &&
-      typeof query.query_content === "string" &&
-      (query.query_type === "kis" || query.query_type === "qa");
-  }
-
   function getSubmissionType() {
-    return localStorage.getItem(TYPE_STORAGE_KEY) === CUSTOM_TYPE
+    return window.config?.submission?.type === CUSTOM_TYPE
       ? CUSTOM_TYPE
       : DRES_TYPE;
   }
@@ -94,8 +44,8 @@
     typeOptions.className = "custom-submit-type-options";
     typeOptions.innerHTML =
       '<legend>Submission type</legend>' +
-      '<label class="custom-submit-type-option"><input type="radio" name="submission-type" value="DRES"><span>DRES</span></label>' +
-      '<label class="custom-submit-type-option"><input type="radio" name="submission-type" value="CUSTOM"><span>CUSTOM</span></label>';
+      '<label class="custom-submit-type-option"><input type="radio" name="submission-type" value="DRES" disabled><span>DRES</span></label>' +
+      '<label class="custom-submit-type-option"><input type="radio" name="submission-type" value="CUSTOM" disabled><span>CUSTOM</span></label>';
     header.insertAdjacentElement("afterend", typeOptions);
 
     const customSettings = document.createElement("div");
@@ -107,13 +57,11 @@
       '<p id="customQueryZipStatus" class="custom-query-zip-status" aria-live="polite"></p>';
     actions.insertAdjacentElement("beforebegin", customSettings);
 
-    typeOptions.addEventListener("change", updateSettingsMode);
     document.getElementById("customQueryZip").addEventListener("change", handleZipSelection);
   }
 
   function updateSettingsMode() {
-    const selected = document.querySelector('input[name="submission-type"]:checked');
-    const type = selected ? selected.value : DRES_TYPE;
+    const type = getSubmissionType();
     const card = document.querySelector("#submitSettingsModal .submit-settings-card");
     const customSettings = document.getElementById("customSubmitSettings");
     if (card) card.dataset.submissionType = type;
@@ -129,18 +77,18 @@
   }
 
   function renderZipStatus() {
-    if (!draftQueries.length) {
+    if (!queries.length) {
       setZipStatus("Choose a ZIP containing *-kis.txt and/or *-qa.txt files.", "");
       return;
     }
-    const kisCount = draftQueries.filter(function (query) {
+    const kisCount = queries.filter(function (query) {
       return query.query_type === "kis";
     }).length;
-    const qaCount = draftQueries.filter(function (query) {
+    const qaCount = queries.filter(function (query) {
       return query.query_type === "qa";
     }).length;
     setZipStatus(
-      (draftZipName || "Query ZIP") + ": loaded " + kisCount + " KIS and " + qaCount + " QA queries.",
+      (zipName || "Query ZIP") + ": loaded " + kisCount + " KIS and " + qaCount + " QA queries.",
       "success",
     );
   }
@@ -148,9 +96,6 @@
   window.openSubmitSettings = function () {
     const result = originalOpenSubmitSettings.apply(this, arguments);
     ensureSettingsUi();
-    draftQueries = savedQueries.slice();
-    draftZipName = savedZipName;
-    zipIsLoading = false;
 
     const input = document.getElementById("customQueryZip");
     if (input) input.value = "";
@@ -158,39 +103,16 @@
     const radio = document.querySelector('input[name="submission-type"][value="' + type + '"]');
     if (radio) radio.checked = true;
     updateSettingsMode();
-    renderZipStatus();
+    if (!zipIsLoading) renderZipStatus();
     return result;
-  };
-
-  window.saveSubmitSettings = function () {
-    const selected = document.querySelector('input[name="submission-type"]:checked');
-    const type = selected ? selected.value : DRES_TYPE;
-    if (type !== CUSTOM_TYPE) {
-      localStorage.setItem(TYPE_STORAGE_KEY, DRES_TYPE);
-      return originalSaveSubmitSettings.apply(this, arguments);
-    }
-    if (zipIsLoading) {
-      setZipStatus("Wait for the ZIP file to finish loading.", "error");
-      return;
-    }
-    if (!draftQueries.length) {
-      setZipStatus("Upload a valid query ZIP before saving CUSTOM mode.", "error");
-      return;
-    }
-
-    savedQueries = draftQueries.slice();
-    savedZipName = draftZipName;
-    persistSavedState();
-    localStorage.setItem(TYPE_STORAGE_KEY, CUSTOM_TYPE);
-    window.closeSubmitSettings();
   };
 
   async function handleZipSelection(event) {
     const input = event.currentTarget;
     const file = input.files && input.files[0];
     if (!file) return;
-    draftQueries = [];
-    draftZipName = "";
+    queries = [];
+    zipName = "";
     if (!file.name.toLowerCase().endsWith(".zip")) {
       setZipStatus("Only .zip files are accepted.", "error");
       input.value = "";
@@ -198,11 +120,12 @@
     }
 
     zipIsLoading = true;
+    input.disabled = true;
     setZipStatus("Reading and validating " + file.name + "...", "");
     try {
       const parsed = await parseQueryZip(file);
-      draftQueries = parsed.queries;
-      draftZipName = file.name;
+      queries = parsed.queries;
+      zipName = file.name;
       renderZipStatus();
     } catch (error) {
       console.error("CUSTOM query ZIP failed:", error);
@@ -210,6 +133,7 @@
       input.value = "";
     } finally {
       zipIsLoading = false;
+      input.disabled = false;
     }
   }
 
@@ -394,7 +318,7 @@
   }
 
   function askCustomAnswer(queryType, videoId, frameId) {
-    const availableQueries = savedQueries.filter(function (query) {
+    const availableQueries = queries.filter(function (query) {
       return query.query_type === queryType;
     });
     if (!availableQueries.length) {

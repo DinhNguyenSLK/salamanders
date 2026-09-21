@@ -2484,6 +2484,28 @@ textarea.textualquery1,
   margin: 6px 0 0;
 }
 
+.model-scene-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.model-default-btn {
+  padding: 3px 8px;
+  border: 1px solid var(--earth-border);
+  border-radius: 4px;
+  background: var(--earth-surface);
+  color: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.model-default-status:not(:empty) {
+  margin-top: 6px;
+  font-size: 11px;
+}
+
 .utility-filter .utility-search-controls {
   align-items: flex-end;
   background: var(--earth-surface);

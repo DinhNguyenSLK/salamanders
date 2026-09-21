@@ -4,6 +4,40 @@ const searchFormID = {
 
 const MAX_TEMPORAL_SCENES = 5;
 
+function availableTextualModes() {
+  return config && config.ui && config.ui["textual-modes"] && config.ui["textual-modes"].length
+    ? config.ui["textual-modes"]
+    : [
+        { name: "Use all", mode: "all" },
+        { name: "OpenCLIP", mode: "openclip" },
+        { name: "SigLIP2", mode: "siglip2" },
+        { name: "ALIGN", mode: "align" },
+      ];
+}
+
+function defaultTextualMode() {
+  const modes = availableTextualModes();
+  try {
+    const saved = localStorage.getItem("defaultTextualModel");
+    if (modes.some((entry) => entry.mode === saved)) return saved;
+  } catch (error) {}
+  return (modes.find((entry) => entry.mode === "all") || modes[0]).mode;
+}
+
+function saveDefaultTextualMode(idx) {
+  const mode = textualMode[idx];
+  const selected = availableTextualModes().find((entry) => entry.mode === mode);
+  if (!selected) return;
+  const status = document.getElementById(`modelDefaultStatus${idx}`);
+  try {
+    localStorage.setItem("defaultTextualModel", mode);
+    document.querySelectorAll(".model-default-status").forEach((el) => { el.textContent = ""; });
+    if (status) status.textContent = `${selected.name} saved as default for new scenes and reloads.`;
+  } catch (error) {
+    if (status) status.textContent = "Could not save the default. Browser storage is unavailable.";
+  }
+}
+
 const sceneChannels = [
   ["image", "Image example", "fa-image"],
   ["ocr", "OCR", null],
@@ -129,7 +163,20 @@ function orderScenePanels(canvasID) {
     const label = document.createElement("div");
     label.className = "ctrl-label";
     label.textContent = `Scene ${canvasID + 1}`;
-    group.append(label, modelOptions);
+    const saveDefault = document.createElement("button");
+    saveDefault.type = "button";
+    saveDefault.className = "model-default-btn";
+    saveDefault.textContent = "Set default";
+    saveDefault.title = "Use this scene's selected model for new scenes and after reloading";
+    saveDefault.addEventListener("click", () => saveDefaultTextualMode(canvasID));
+    const header = document.createElement("div");
+    header.className = "model-scene-header";
+    header.append(label, saveDefault);
+    const status = document.createElement("div");
+    status.id = `modelDefaultStatus${canvasID}`;
+    status.className = "model-default-status";
+    status.setAttribute("role", "status");
+    group.append(header, modelOptions, status);
     modelMenu.appendChild(group);
   }
   fieldGroup.remove();
@@ -165,19 +212,10 @@ const searchForm = (
   css_class = "",
 ) => {
   let modesHtml = "";
-  const modes =
-    config && config.ui && config.ui["textual-modes"]
-      ? config.ui["textual-modes"]
-      : [
-          { name: "Use all", mode: "all" },
-          { name: "OpenCLIP", mode: "openclip" },
-          { name: "SigLIP2", mode: "siglip2" },
-          { name: "ALIGN", mode: "align" },
-        ];
-  modes.forEach((mode, i) => {
-    const hasAll = modes.some((m) => m.mode === "all");
-    const checked =
-      (hasAll && mode.mode === "all") || (!hasAll && i === 0) ? "checked" : "";
+  const modes = availableTextualModes();
+  const selectedMode = textualMode[canvasID] || defaultTextualMode();
+  modes.forEach((mode) => {
+    const checked = mode.mode === selectedMode ? "checked" : "";
     modesHtml += `
 			<label class="mode-chip">
 				<input type="radio" ${checked} name="textualMode${canvasID}" id="textualMode${canvasID}_${mode.mode}" value="${mode.mode}"
