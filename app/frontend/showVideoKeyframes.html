@@ -10,7 +10,7 @@
 	<link rel="stylesheet" href="css/jquery-ui.min.css">
 	<link rel="stylesheet" href="css/fontawesome.min.css">
 	<link rel="stylesheet" href="css/bootstrap.css">
-	<link rel="stylesheet" href="css/visione.css?v=25">
+	<link rel="stylesheet" href="css/visione.css?v=30">
 	<link rel="stylesheet" href="css/customSubmission.css?v=1">
 	<style>
 		/* Override main UI lock — this page needs normal document scroll */
@@ -317,8 +317,8 @@
 	<script src="js/jquery-3.3.1.min.js"></script>
 	<script src="js/jquery-ui.min.js"></script>
 	<script src="js/js-yaml.min.js"></script>
-	<script src="js/visione.js?v=24"></script>
-	<script src="js/customSubmission.js?v=1"></script>
+	<script src="js/visione.js?v=51"></script>
+	<script src="js/customSubmission.js?v=3"></script>
 	<script src="js/keyframeLoader.js?v=2"></script>
 </head>
 
@@ -362,23 +362,12 @@
 		}
 
 		function submit(imgId, videoId) {
-			if (localStorage.getItem('submissionType') === 'CUSTOM') {
-				submitVersion2({ imgId: imgId, videoId: videoId });
+			if (localStorage.getItem('taskType') === 'kis' || localStorage.getItem('taskType') === 'qa') {
+				if (!submitFromMainWindow(imgId, videoId)) submitVersion2({ imgId: imgId, videoId: videoId });
 				return;
 			}
 
 			if (submitFromMainWindow(imgId, videoId)) return;
-
-			if (checkQA()) {
-				submitQAFrame(imgId, videoId).then(function (response) {
-					showKISServerResponse('QA submit response', response, false);
-				}).catch(function (error) {
-					if (error.cancelled) return;
-					console.error('QA submit failed:', error);
-					showKISServerResponse('QA submit failed', error.message, true);
-				});
-				return;
-			}
 			if (submitAlert()) {
 					if (localStorage.getItem('taskType') === 'kis') {
 						submitKISFrame(imgId, videoId).then(function (response) {

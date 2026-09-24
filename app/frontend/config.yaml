@@ -87,10 +87,4 @@ ui:
       - { name: yellow }
 
 
-dres:
-
-  endpoint: http://171.244.37.116:18114          # ĐỔI DRES CỦA BTC
-
-  sessionID: ZQ0En-klVlMbu3eFpp0ggDn2SCA5lUkI    # MỖI ACCOUNT ĐƯỢC CẤP 1 SESSIONID KHÔNG ĐỔI
-  
-  evaluationID:  b71859d3-9307-483a-badb-2555d36849bd    # MỖI BÀI THI THỬ CÓ 1 EVALUATIONID
+# DRES credentials are stored in app/submission_runtime.env on each local backend.

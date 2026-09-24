@@ -1628,6 +1628,93 @@ function hideLoadingSpinner() {
 
 var _searchXhr = null;
 
+function setVideoIdSearchStatus(message, state) {
+  const status = document.getElementById("videoIdSearchStatus");
+  if (!status) return;
+  status.textContent = message || "";
+  status.dataset.state = state || "";
+}
+
+function searchByVideoId() {
+  const input = document.getElementById("videoIdSearchInput");
+  if (!input) return;
+
+  const videoId = input.value.trim().toUpperCase();
+  input.value = videoId;
+  if (!/^[A-Z0-9_-]{1,100}$/.test(videoId)) {
+    setVideoIdSearchStatus("Enter a valid video ID, for example L28_V023.", "error");
+    input.focus();
+    return;
+  }
+
+  if (_searchXhr && _searchXhr.readyState !== 4) {
+    try {
+      _searchXhr.abort();
+    } catch (e) {}
+  }
+
+  cancelBackgroundResultRendering();
+  resultsRenderGeneration++;
+  latestQuery = JSON.stringify({ videoId: videoId });
+  loadingSpinner = document.getElementById("loading-spinner");
+  if (loadingSpinner) loadingSpinner.style.display = "block";
+  setVideoIdSearchStatus("Loading all keyframes...", "loading");
+  setSearchLatency(null, "loading");
+  const requestStartedAt = performance.now();
+
+  _searchXhr = $.ajax({
+    type: "GET",
+    async: true,
+    timeout: 30000,
+    dataType: "json",
+    url:
+      urlVBSService.replace(/\/$/, "") +
+      "/getAllVideoKeyframes?videoId=" +
+      encodeURIComponent(videoId),
+    success: function (frameIds) {
+      _searchXhr = null;
+      const ids = Array.isArray(frameIds) ? frameIds : [];
+      const videoResults = ids.map(function (frameId) {
+        return {
+          imgId: String(frameId),
+          videoId: videoId,
+          score: 0,
+        };
+      });
+      setSearchLatency(performance.now() - requestStartedAt, "ready");
+      setVideoIdSearchStatus(
+        ids.length + (ids.length === 1 ? " keyframe" : " keyframes"),
+        ids.length ? "success" : "error",
+      );
+      setResults(videoResults, true);
+    },
+    error: function (xhr, status, error) {
+      if (status === "abort") return;
+      _searchXhr = null;
+      setSearchLatency(null, "error");
+      setVideoIdSearchStatus("Could not load this video.", "error");
+      console.error(
+        "video ID search failed:",
+        status,
+        error,
+        xhr && xhr.responseText,
+      );
+      hideLoadingSpinner();
+      setResults("");
+    },
+  });
+}
+
+function initVideoIdSearch() {
+  const form = document.getElementById("videoIdSearch");
+  if (!form || form.dataset.bound === "true") return;
+  form.dataset.bound = "true";
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+    searchByVideoId();
+  });
+}
+
 function setSearchLatency(milliseconds, state) {
   const badge = document.getElementById("searchLatency");
   const value = document.getElementById("searchLatencyValue");
@@ -2373,33 +2460,14 @@ function submitResult(id, videoId, textAnswer = null, isAsync = false) {
 }
 
 function getDresSettings() {
-  const dres = config?.dres || {};
-  return {
-    endpoint: String(dres.endpoint || "").trim().replace(/\/+$/, ""),
-    sessionId: String(dres.sessionID || "").trim(),
-    evaluationId: String(dres.evaluationID || "").trim(),
-  };
+  return {};
 }
 
 function getDresSubmitUrl() {
-  const { endpoint, sessionId, evaluationId } = getDresSettings();
-  if (!endpoint || !sessionId || !evaluationId) {
-    throw new Error(
-      "Configure dres.endpoint, dres.sessionID and dres.evaluationID in frontend/config.yaml before submitting.",
-    );
-  }
-  return endpoint + "/api/v2/submit/" + encodeURIComponent(evaluationId) +
-    "?session=" + encodeURIComponent(sessionId);
+  throw new Error("Direct DRES submission is disabled; use the shared host queue.");
 }
 
 function openSubmitSettings() {
-  const { sessionId, evaluationId } = getDresSettings();
-  if (!document.getElementById("submitSettingsModal")) {
-    alert("Session ID: " + sessionId + "\nEvaluation ID: " + evaluationId);
-    return;
-  }
-  $("#submitSessionId").val(sessionId);
-  $("#submitEvaluationId").val(evaluationId);
   $("#submitSettingsModal").prop("hidden", false);
 }
 
@@ -2442,40 +2510,11 @@ function getFrameTimestampMs(frameId, videoId) {
 }
 
 function submitKISFrame(frameId, videoId) {
-  try {
-    const timestampMs = getFrameTimestampMs(frameId, videoId);
-    return submitKISValues(
-      videoId,
-      timestampMs,
-      timestampMs,
-    );
-  } catch (error) {
-    return Promise.reject(error);
-  }
+  return window.queueHostSubmissionFrame(frameId, videoId);
 }
 
 function submitKISValues(videoId, startMs, endMs) {
-  let url;
-  try {
-    url = getDresSubmitUrl();
-  } catch (error) {
-    return Promise.reject(error);
-  }
-  const payload = {
-    answerSets: [
-      { answers: [{ mediaItemName: videoId, start: startMs, end: endMs }] },
-    ],
-  };
-  return fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  }).then(async function (response) {
-    const text = await response.text();
-    const serverResponse = formatDresServerResponse(response, text);
-    if (!response.ok) throw new Error(serverResponse);
-    return serverResponse;
-  });
+  return Promise.reject(new Error("Use a frame to save to the shared host queue first."));
 }
 
 function formatDresServerResponse(response, body) {
@@ -2490,31 +2529,7 @@ function formatDresServerResponse(response, body) {
 }
 
 function submitQAFrame(frameId, videoId) {
-  let url;
-  let timestampMs;
-  try {
-    url = getDresSubmitUrl();
-    timestampMs = getFrameTimestampMs(frameId, videoId);
-  } catch (error) {
-    return Promise.reject(error);
-  }
-
-  return askQAAnswer(videoId, timestampMs).then(function (answer) {
-    const text = answer + "-" + videoId + "-" + timestampMs;
-    const payload = {
-      answerSets: [{ answers: [{ text: text }] }],
-    };
-    return fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    }).then(async function (response) {
-      const responseText = await response.text();
-      const serverResponse = formatDresServerResponse(response, responseText);
-      if (!response.ok) throw new Error(serverResponse);
-      return serverResponse;
-    });
-  });
+  return window.queueHostSubmissionFrame(frameId, videoId);
 }
 
 function askQAAnswer(videoId, timestampMs) {
@@ -2607,47 +2622,22 @@ function submitAtTime(videoId, time) {
 }
 
 function submitVersion2(selectedItem) {
+  const taskType = localStorage.getItem("taskType");
+  if (taskType === "kis" || taskType === "qa") {
+    if (typeof window.queueHostSubmissionFrame !== "function") {
+      showKISServerResponse("Host submission unavailable", "Reload the page to enable the shared host queue.", true);
+      return null;
+    }
+    return window.queueHostSubmissionFrame(selectedItem.imgId, selectedItem.videoId)
+      .then(function (message) { showKISServerResponse("Saved on host", message, false); })
+      .catch(function (error) {
+        if (!error.cancelled) showKISServerResponse("Host submission failed", error.message, true);
+      });
+  }
   $("#submitted_bar").css("display", "block");
   let res = null;
-  if (localStorage.getItem("taskType") === "qa") {
-    showKISServerResponse(
-      "Submitting to DRES",
-      "Waiting for the DRES server response...",
-      false,
-    );
-    submitQAFrame(selectedItem.imgId, selectedItem.videoId)
-      .then(function (response) {
-        showKISServerResponse("DRES server response", response, false);
-      })
-      .catch(function (error) {
-        if (error.cancelled) {
-          $("#kisServerResponseModal").prop("hidden", true);
-          return;
-        }
-        console.error("QA submit failed:", error);
-        showKISServerResponse("DRES submission failed", error.message, true);
-      });
-  } else {
-    if (submitAlert()) {
-      if (localStorage.getItem("taskType") === "kis") {
-        showKISServerResponse(
-          "Submitting to DRES",
-          "Waiting for the DRES server response...",
-          false,
-        );
-        submitKISFrame(selectedItem.imgId, selectedItem.videoId)
-          .then(function (response) {
-            showKISServerResponse("DRES server response", response, false);
-          })
-          .catch(function (error) {
-            console.error("KIS submit failed:", error);
-            showKISServerResponse(
-              "DRES submission failed",
-              error.message,
-              true,
-            );
-          });
-      } else if (localStorage.getItem("taskType") === "avs")
+  if (submitAlert()) {
+      if (taskType === "avs")
         submitResult(
           selectedItem.imgId,
           selectedItem.videoId,
@@ -2672,9 +2662,8 @@ function submitVersion2(selectedItem) {
 
       //che fa? boh!
       updateAVSInfo();
-      if (localStorage.getItem("taskType") === "avs") avsHideSubmittedVideos();
+      if (taskType === "avs") avsHideSubmittedVideos();
       else avsHilightlighSubmittedVideos();
-    }
   }
   return res;
 }
@@ -3123,6 +3112,91 @@ function isSidebarCollapsed() {
   return localStorage.getItem("sidebarCollapsed") === "1";
 }
 
+const SIDEBAR_DEFAULT_WIDTH = 280;
+const SIDEBAR_MIN_WIDTH = 240;
+const SIDEBAR_MAX_WIDTH = 640;
+
+function maxSidebarWidth() {
+  return Math.max(
+    SIDEBAR_MIN_WIDTH,
+    Math.min(SIDEBAR_MAX_WIDTH, window.innerWidth - 360),
+  );
+}
+
+function clampSidebarWidth(value) {
+  const numeric = value === null || value === "" ? SIDEBAR_DEFAULT_WIDTH : Number(value);
+  const width = Number.isFinite(numeric) ? numeric : SIDEBAR_DEFAULT_WIDTH;
+  return Math.round(Math.min(maxSidebarWidth(), Math.max(SIDEBAR_MIN_WIDTH, width)));
+}
+
+function savedSidebarWidth() {
+  return clampSidebarWidth(localStorage.getItem("searchSidebarWidth"));
+}
+
+function setSidebarWidth(value, persist) {
+  const width = clampSidebarWidth(value);
+  $(".sidebarGrid").css({ width: width + "px", maxWidth: width + "px" });
+  $(".bodyGrid").css(
+    "grid-template-columns",
+    width + "px minmax(0, 1fr) auto",
+  );
+  $("#sidebarResizeHandle").attr("aria-valuenow", String(width));
+  if (persist) localStorage.setItem("searchSidebarWidth", String(width));
+  return width;
+}
+
+function initSidebarResizer() {
+  const handle = document.getElementById("sidebarResizeHandle");
+  const body = document.querySelector(".bodyGrid");
+  if (!handle || !body || handle.dataset.bound === "1") return;
+  handle.dataset.bound = "1";
+  let dragging = false;
+  let currentWidth = savedSidebarWidth();
+
+  function resizeFromPointer(event) {
+    const bodyLeft = body.getBoundingClientRect().left;
+    currentWidth = setSidebarWidth(event.clientX - bodyLeft, false);
+  }
+
+  function finishResize(event) {
+    if (!dragging) return;
+    dragging = false;
+    body.classList.remove("sidebar-resizing");
+    setSidebarWidth(currentWidth, true);
+    if (handle.hasPointerCapture?.(event.pointerId)) handle.releasePointerCapture(event.pointerId);
+  }
+
+  handle.addEventListener("pointerdown", function (event) {
+    if (event.button !== 0 || isSidebarCollapsed()) return;
+    event.preventDefault();
+    dragging = true;
+    body.classList.add("sidebar-resizing");
+    handle.setPointerCapture(event.pointerId);
+    resizeFromPointer(event);
+  });
+  handle.addEventListener("pointermove", function (event) {
+    if (dragging) resizeFromPointer(event);
+  });
+  handle.addEventListener("pointerup", finishResize);
+  handle.addEventListener("pointercancel", finishResize);
+  handle.addEventListener("dblclick", function () {
+    currentWidth = setSidebarWidth(SIDEBAR_DEFAULT_WIDTH, true);
+  });
+  handle.addEventListener("keydown", function (event) {
+    let next = savedSidebarWidth();
+    if (event.key === "ArrowLeft") next -= 20;
+    else if (event.key === "ArrowRight") next += 20;
+    else if (event.key === "Home") next = SIDEBAR_MIN_WIDTH;
+    else if (event.key === "End") next = maxSidebarWidth();
+    else return;
+    event.preventDefault();
+    currentWidth = setSidebarWidth(next, true);
+  });
+  window.addEventListener("resize", function () {
+    if (!isSidebarCollapsed()) currentWidth = setSidebarWidth(savedSidebarWidth(), false);
+  });
+}
+
 function applySidebarLayout() {
   const collapsed = isSidebarCollapsed();
   const $body = $(".bodyGrid");
@@ -3136,8 +3210,8 @@ function applySidebarLayout() {
     $btn.attr("aria-expanded", "false").attr("title", "Hiện thanh công cụ");
   } else {
     $body.removeClass("sidebar-collapsed");
-    $sidebar.css({ width: "280px", maxWidth: "280px", display: "flex" });
-    $body.css("grid-template-columns", "280px minmax(0, 1fr) auto");
+    $sidebar.css("display", "flex");
+    setSidebarWidth(savedSidebarWidth(), false);
     $btn.attr("aria-expanded", "true").attr("title", "Ẩn thanh công cụ");
   }
 }
@@ -3153,6 +3227,7 @@ function initLayout() {
   // the fixed utility bar at the top of the page.
   localStorage.setItem("sidebarCollapsed", "0");
   document.body.classList.add("advanced-mode");
+  initSidebarResizer();
   applySidebarLayout();
   $("#visionelogo").addClass("visioneLogo sidebar-brand");
 }
@@ -3683,6 +3758,7 @@ async function init() {
   initLayout();
   displayAdvanced();
   initObjectIconsPanel();
+  initVideoIdSearch();
   initResultDragScroll();
 
   var script = document.createElement("script");

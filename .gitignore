@@ -11,6 +11,7 @@ venv/
 .env/
 .venv/
 app/.env
+app/submission_runtime.env
 
 # IDE
 .vscode/

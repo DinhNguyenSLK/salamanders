@@ -10,7 +10,8 @@
   <script src="https://vjs.zencdn.net/7.18.1/video.min.js"></script>
   <script src="js/jquery-3.3.1.min.js"></script>
   <script src="js/js-yaml.min.js"></script>
-  <script src="js/visione.js?v=24"></script>
+  <script src="js/visione.js?v=51"></script>
+  <script src="js/customSubmission.js?v=3"></script>
   <script src="js/videoYoutubeUrls.js?v=1"></script>
   <style>
     * { box-sizing: border-box; }
@@ -212,14 +213,8 @@
       if (submitAlert()) {
         var currentFrame = ffmpegFrameIndex(whereYouAt, videoFps);
         var currentFrameId = videoid + '-' + padFrame(currentFrame);
-        if (localStorage.getItem('taskType') === 'qa') {
-          submitQAFrame(currentFrameId, videoid)
-            .then(function (response) { showKISServerResponse('QA submit response', response, false); })
-            .catch(function (error) { if (!error.cancelled) showKISServerResponse('QA submit failed', error.message, true); });
-        } else if (localStorage.getItem('taskType') === 'kis') {
-          submitKISFrame(currentFrameId, videoid)
-            .then(function (response) { showKISServerResponse('KIS submit response', response, false); })
-            .catch(function (error) { showKISServerResponse('KIS submit failed', error.message, true); });
+        if (localStorage.getItem('taskType') === 'qa' || localStorage.getItem('taskType') === 'kis') {
+          submitVersion2({ imgId: currentFrameId, videoId: videoid });
         } else {
           res = submitAtTime(videoid, whereYouAt);
           console.log(res);
