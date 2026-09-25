@@ -150,6 +150,35 @@
     return editedPayloads.has(item.id) ? editedPayloads.get(item.id) : defaultDresPayload(item);
   }
 
+  async function copyDresPayload(item, button) {
+    const text = JSON.stringify(payloadFor(item), null, 2);
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const temporary = document.createElement("textarea");
+        temporary.value = text;
+        temporary.setAttribute("readonly", "");
+        temporary.style.position = "fixed";
+        temporary.style.opacity = "0";
+        document.body.appendChild(temporary);
+        temporary.select();
+        const copied = document.execCommand("copy");
+        temporary.remove();
+        if (!copied) throw new Error("The browser denied clipboard access.");
+      }
+      button.textContent = "Copied ✓";
+      button.classList.add("is-copied");
+      window.setTimeout(function () {
+        if (!button.isConnected) return;
+        button.textContent = "Copy JSON";
+        button.classList.remove("is-copied");
+      }, 1600);
+    } catch (error) {
+      window.showKISServerResponse("Cannot copy JSON", error.message, true);
+    }
+  }
+
   function editDresPayload(item) {
     const modal = document.getElementById("editDresPayloadModal");
     const textarea = document.getElementById("editDresPayloadText");
@@ -254,8 +283,14 @@
         editButton.addEventListener("click", async function () {
           if (await editDresPayload(item)) render();
         });
+        const copyButton = createText("button", "host-queue-copy", "Copy JSON");
+        copyButton.type = "button";
+        copyButton.addEventListener("click", function () {
+          copyDresPayload(item, copyButton);
+        });
         actions.appendChild(button);
         actions.appendChild(editButton);
+        actions.appendChild(copyButton);
         card.appendChild(actions);
       }
       list.appendChild(card);

@@ -3507,7 +3507,9 @@ textarea.textualquery1,
 .host-queue-submit { border: 0; background: #198754; color: white; }
 .host-queue-edit { background: #fff8ec; border: 1px solid #c99b5e; color: #754e2b; }
 .host-queue-edit:hover, .host-queue-edit.is-edited { background: #f4e5c9; border-color: #aa6a20; }
-.host-queue-submit:disabled, .host-queue-edit:disabled { opacity: .6; cursor: wait; }
+.host-queue-copy { background: #fff; border: 1px solid #c8b79f; color: #5f4d3a; }
+.host-queue-copy:hover, .host-queue-copy.is-copied { background: #eee6da; border-color: #8f7658; }
+.host-queue-submit:disabled, .host-queue-edit:disabled, .host-queue-copy:disabled { opacity: .6; cursor: wait; }
 .host-payload-editor-card { width: min(680px, calc(100vw - 40px)); }
 .host-payload-editor-hint { color: #6f5b45; font-size: 12px; margin: 0 0 8px; }
 .host-payload-editor-text { background: #fffdf8; border: 1px solid #d8c2a3; border-radius: 6px; box-sizing: border-box; color: #3e2f22; display: block; font-family: Consolas, "Courier New", monospace; font-size: 12px; line-height: 1.5; min-height: 310px; padding: 10px; resize: vertical; tab-size: 2; width: 100%; }
