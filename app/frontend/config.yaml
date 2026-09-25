@@ -10,7 +10,7 @@ ui:
   top-record: 5
 
   # Top-k results requested from the backend (slider bounds / default).
-  k: 1000
+  k: 3000
   k-min: 100
   k-max: 10000
 
@@ -23,6 +23,7 @@ ui:
     - cooking
     - lecture
     - lifelog
+    - camera
 
   # The default text-to-image similarity modes to display in the UI as radio
   # buttons. Modes must match backend ParamItems.textual_model.

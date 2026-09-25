@@ -35,7 +35,7 @@ class ParamItems(BaseModel):
 class SearchParams(BaseModel):
     query: list[QueryItems]
     parameters: list[ParamItems]
-    video_type: Literal["all", "cycling", "news", "dance", "cooking", "lecture", "lifelog"] = "all"
+    video_type: Literal["all", "cycling", "news", "dance", "cooking", "lecture", "lifelog", "camera"] = "all"
     k: int = Field(default=1000, ge=100, le=10000, description="Top-k kết quả tốt nhất")
     n_frames_per_round: int = Field(default=10, ge=3, le=30, description="Số frame cho mỗi video id")
     rearrange: bool = Field(default=False, description="Sắp xếp lại kết quả theo shot_id")

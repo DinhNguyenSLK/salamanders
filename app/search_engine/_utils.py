@@ -14,9 +14,13 @@ def _filter(results: list[SearchResult], pre_filter_results: set, video_type: st
     "L27": "lifelog",
     "L28": "lifelog",
     "L29": "lifelog",
-    "L30": "lifelog"
+    "L30": "lifelog",
+    "N": "camera"
 }   
-    if video_type != "all":
+    if video_type == "camera":
+        results = [result for result in results if  video_type_rule.get(result.imgId[0]) == video_type]
+
+    elif video_type != "all":
         results = [result for result in results if  video_type_rule.get(result.imgId.split("_")[0]) == video_type]
 
     if pre_filter_results is None:

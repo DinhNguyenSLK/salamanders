@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="css/jquery-ui.min.css" />
     <link rel="stylesheet" href="css/fontawesome.min.css" />
     <link rel="stylesheet" href="css/bootstrap.css" />
-    <link rel="stylesheet" href="css/visione.css?v=host5" />
+    <link rel="stylesheet" href="css/visione.css?v=representative1" />
     <link rel="stylesheet" href="css/customSubmission.css?v=1" />
     <link rel="stylesheet" href="css/queryByExample.css?v=11" />
     <link rel="stylesheet" href="css/toggle.css" />
@@ -38,6 +38,17 @@
         onclick="toggleRearrange()"
       >
         <i class="fas fa-random" aria-hidden="true"></i>
+      </button>
+      <button
+        type="button"
+        id="representativeToggle"
+        class="utility-rearrange utility-representative"
+        title="Show one frame per video (single query only)"
+        aria-label="Show one frame per video"
+        aria-pressed="false"
+        onclick="toggleRepresentativeView()"
+      >
+        <i class="fas fa-th" aria-hidden="true"></i>
       </button>
       <div class="utility-task" aria-label="Task">
         <span class="utility-task-label">Task</span>
@@ -392,7 +403,7 @@
     <script src="js/fabric.js"></script>
     <script src="js/js-yaml.min.js"></script>
     <script src="js/queryByExample.js?v=6"></script>
-    <script src="js/visione.js?v=host3"></script>
+    <script src="js/visione.js?v=representative1"></script>
     <script src="js/visioneAVS.js?v=15"></script>
     <script src="js/customSubmission.js?v=host1"></script>
     <script src="js/hostQueue.js?v=host4"></script>

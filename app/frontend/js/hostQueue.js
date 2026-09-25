@@ -301,7 +301,6 @@
 
   async function submitToDres(item, button) {
     if (sending.has(item.id)) return;
-    if (!confirm("Submit " + item.fileName + " to DRES now?")) return;
     sending.add(item.id);
     button.disabled = true;
     button.textContent = "Submitting...";
