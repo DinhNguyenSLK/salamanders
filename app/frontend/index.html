@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="css/jquery-ui.min.css" />
     <link rel="stylesheet" href="css/fontawesome.min.css" />
     <link rel="stylesheet" href="css/bootstrap.css" />
-    <link rel="stylesheet" href="css/visione.css?v=112" />
+    <link rel="stylesheet" href="css/visione.css?v=host5" />
     <link rel="stylesheet" href="css/customSubmission.css?v=1" />
     <link rel="stylesheet" href="css/queryByExample.css?v=11" />
     <link rel="stylesheet" href="css/toggle.css" />
@@ -48,6 +48,10 @@
         <label class="utility-radio-label" title="Visual Question Answering">
           <input type="radio" aria-label="Visual Question Answering" name="utility-option" value="qa" onclick="setTaskType('qa')" />
           Q&amp;A
+        </label>
+        <label class="utility-radio-label" title="Temporal Retrieval and Alignment of Key Events">
+          <input type="radio" aria-label="TRAKE" name="utility-option" value="trake" onclick="setTaskType('trake')" />
+          TRAKE
         </label>
       </div>
       <div id="utilityActions" class="utility-actions" aria-label="Additional utilities">
@@ -103,12 +107,10 @@
     <div id="submitSettingsModal" class="submit-settings-modal" hidden role="dialog" aria-modal="true" aria-labelledby="submitSettingsTitle">
       <div class="submit-settings-card">
         <div class="submit-settings-header">
-          <span id="submitSettingsTitle">Submit settings</span>
+          <span id="submitSettingsTitle">Query ZIP</span>
           <button type="button" class="submit-settings-close" onclick="closeSubmitSettings()" aria-label="Close">&times;</button>
         </div>
-        <p>Settings are loaded from config.yaml. Edit that file and reload the page to apply changes.</p>
-        <label>Session ID<input id="submitSessionId" type="text" autocomplete="off" readonly></label>
-        <label>Evaluation ID<input id="submitEvaluationId" type="text" autocomplete="off" readonly></label>
+        <p>Queries stay in this tab until reload. Upload a ZIP to choose a query when saving an answer. Without a ZIP, answers are saved as manual submissions.</p>
         <div class="submit-settings-actions">
           <button type="button" onclick="closeSubmitSettings()">Close</button>
         </div>
@@ -121,6 +123,34 @@
           <button type="button" class="submit-settings-close" onclick="closeUserInfo()" aria-label="Close">&times;</button>
         </div>
         <div class="user-info-name"><i class="fa fa-user" aria-hidden="true"></i><span id="userInfoName"></span></div>
+      </div>
+    </div>
+    <div id="clearSubmissionsModal" class="submit-settings-modal kis-submit-confirm-modal" hidden role="dialog" aria-modal="true" aria-labelledby="clearSubmissionsTitle" aria-describedby="clearSubmissionsMessage">
+      <div class="submit-settings-card kis-submit-confirm-card host-clear-confirm-card">
+        <div class="submit-settings-header">
+          <span id="clearSubmissionsTitle">Clear submitted answers</span>
+          <button type="button" class="submit-settings-close" data-clear-cancel aria-label="Close">&times;</button>
+        </div>
+        <p id="clearSubmissionsMessage" class="host-clear-confirm-copy"></p>
+        <div class="submit-settings-actions">
+          <button type="button" data-clear-cancel>Cancel</button>
+          <button id="clearSubmissionsConfirm" type="button" class="host-clear-danger" data-clear-confirm>Clear all</button>
+        </div>
+      </div>
+    </div>
+    <div id="editDresPayloadModal" class="submit-settings-modal kis-submit-confirm-modal" hidden role="dialog" aria-modal="true" aria-labelledby="editDresPayloadTitle" aria-describedby="editDresPayloadHint">
+      <div class="submit-settings-card kis-submit-confirm-card host-payload-editor-card">
+        <div class="submit-settings-header">
+          <span id="editDresPayloadTitle">Edit DRES JSON</span>
+          <button type="button" class="submit-settings-close" data-payload-cancel aria-label="Close">&times;</button>
+        </div>
+        <p id="editDresPayloadHint" class="host-payload-editor-hint">This JSON will be sent to DRES for this submission. Edits stay in this tab until reload.</p>
+        <textarea id="editDresPayloadText" class="host-payload-editor-text" spellcheck="false" aria-label="DRES JSON payload"></textarea>
+        <p id="editDresPayloadError" class="host-payload-editor-error" role="alert"></p>
+        <div class="submit-settings-actions">
+          <button type="button" data-payload-cancel>Cancel</button>
+          <button id="editDresPayloadSave" type="button" class="submit-settings-save">Save JSON</button>
+        </div>
       </div>
     </div>
     <div id="content" class="containerGrid">
@@ -162,6 +192,24 @@
                   <div id="palette" class="palette"></div>
                 </div>
               </div>
+              <form id="videoIdSearch" class="video-id-search" role="search" aria-label="Search by video ID">
+                <div class="video-id-search-row">
+                  <input
+                    id="videoIdSearchInput"
+                    type="search"
+                    inputmode="text"
+                    autocomplete="off"
+                    maxlength="100"
+                    placeholder="Video ID (L28_V023)"
+                    aria-label="Video ID"
+                    aria-describedby="videoIdSearchStatus"
+                  />
+                  <button id="videoIdSearchButton" type="submit" title="Show evenly spaced keyframes" aria-label="Show evenly spaced keyframes for this video">
+                    <i class="fa fa-search" aria-hidden="true"></i>
+                  </button>
+                </div>
+                <p id="videoIdSearchStatus" class="video-id-search-status" aria-live="polite"></p>
+              </form>
               <div id="mainSearchBox"></div>
             </div>
             <div class="sidebar-scroll">
@@ -191,10 +239,11 @@
         </div>
         <div class="rightSidebarGrid" id="submitted_bar" style="display: none">
           <div class="submitted-header">
-            <span class="submitted-title">Submitted</span>
-            <b id="submitted_num" class="submitted-count"></b>
+            <span class="submitted-title">Submission</span>
+            <div class="submitted-header-actions"><b id="submitted_num" class="submitted-count"></b><button id="hostQueueClear" class="host-queue-clear" type="button" title="Clear all submissions" aria-label="Clear all submissions" hidden><i class="fa fa-trash" aria-hidden="true"></i></button><button id="submissionToggle" class="submission-toggle" type="button" title="Hide submission panel" aria-label="Hide submission panel" aria-expanded="true" aria-controls="hostQueuePanel avsSubmittedTab">&#8250;</button></div>
           </div>
           <div id="avsSubmittedTab" class="submitted-list"></div>
+          <section id="hostQueuePanel" hidden><div id="hostQueueStatus" class="host-queue-status">Connecting to host...</div><div id="hostQueueList" class="submitted-list"></div></section>
         </div>
       </div>
     </div>
@@ -343,14 +392,15 @@
     <script src="js/fabric.js"></script>
     <script src="js/js-yaml.min.js"></script>
     <script src="js/queryByExample.js?v=6"></script>
-    <script src="js/visione.js?v=48"></script>
+    <script src="js/visione.js?v=host3"></script>
     <script src="js/visioneAVS.js?v=15"></script>
-    <script src="js/customSubmission.js?v=1"></script>
+    <script src="js/customSubmission.js?v=host1"></script>
+    <script src="js/hostQueue.js?v=host4"></script>
     <script src="js/canvas.js?v=6"></script>
     <script src="js/search_bar_templates.js?v=26"></script>
     <script src="js/searchHistory.js?v=1"></script>
     <script>
-      init().catch(function (err) {
+      init().then(function () { return window.initHostQueue(); }).catch(function (err) {
         console.error("init failed:", err);
       });
 

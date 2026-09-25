@@ -10,8 +10,10 @@
   <script src="https://vjs.zencdn.net/7.18.1/video.min.js"></script>
   <script src="js/jquery-3.3.1.min.js"></script>
   <script src="js/js-yaml.min.js"></script>
-  <script src="js/visione.js?v=24"></script>
-  <script src="js/videoYoutubeUrls.js?v=1"></script>
+  <script src="js/visione.js?v=host1"></script>
+  <script src="js/customSubmission.js?v=host1"></script>
+  <script src="js/trakeSubmission.js?v=1"></script>
+  <link rel="stylesheet" href="css/customSubmission.css?v=1">
   <style>
     * { box-sizing: border-box; }
     body {
@@ -42,6 +44,34 @@
       padding-left: 0.5em;
       padding-right: 0.5em;
     }
+    .video-js .vjs-play-progress::before {
+      content: "" !important;
+      width: 3px;
+      height: 17px;
+      top: -7px;
+      right: -1px;
+      border-radius: 0;
+      background: #fff;
+      box-shadow: 0 0 2px #111;
+    }
+    .video-js .vjs-mouse-display .vjs-time-tooltip { display: none; }
+    #timelinePreview {
+      position: absolute;
+      z-index: 30;
+      width: 164px;
+      padding: 5px;
+      border: 1px solid #777;
+      border-radius: 4px;
+      background: #111;
+      color: #fff;
+      box-shadow: 0 4px 14px #0009;
+      pointer-events: none;
+      text-align: center;
+      font: 12px Arial, sans-serif;
+    }
+    #timelinePreview[hidden] { display: none; }
+    #timelinePreview img { display: block; width: 152px; height: 86px; object-fit: contain; background: #000; }
+    #timelinePreviewTime { display: block; margin-top: 4px; }
     #frameHud {
       margin-top: 10px;
       padding: 10px 12px;
@@ -182,6 +212,17 @@
       font-size: 14px;
     }
     #submit:hover { background: #e09010; }
+    #submit[hidden], #trakePanel[hidden], #trakeConfirm[hidden] { display: none; }
+    #trakePanel { margin-top: 12px; max-width: 640px; padding: 12px; background: #111; border: 1px solid #444; border-radius: 5px; }
+    #trakePanel h2 { margin: 0 0 8px; font: 600 16px Arial, sans-serif; }
+    .trake-slot { display: flex; align-items: center; gap: 8px; margin: 7px 0; }
+    .trake-slot label { width: 65px; flex: none; }
+    .trake-slot input { min-width: 0; flex: 1; padding: 7px; border: 1px solid #777; border-radius: 4px; }
+    .trake-slot button, #trakeAdd, #trakeSubmit { padding: 7px 9px; cursor: pointer; border: 1px solid #666; border-radius: 4px; }
+    #trakeSubmit { background: #198754; border-color: #198754; color: #fff; margin-left: 8px; }
+    #trakeError { color: #ff9e9e; min-height: 18px; font: 13px Arial, sans-serif; }
+    #trakeJson { width: 100%; min-height: 170px; resize: vertical; font: 13px Consolas, monospace; }
+    @media (max-width: 520px) { .trake-slot { flex-wrap: wrap; } .trake-slot input { flex-basis: calc(100% - 80px); } }
   </style>
 </head>
 
@@ -200,6 +241,7 @@
     }
 
     function submitAtCurrentPlayTime() {
+      if (localStorage.getItem('taskType') === 'trake') return window.openTrakeConfirm();
       if (youtubeFallbackActive) {
         if (youtubePlayer && youtubePlayer.pauseVideo) youtubePlayer.pauseVideo();
       } else {
@@ -212,14 +254,8 @@
       if (submitAlert()) {
         var currentFrame = ffmpegFrameIndex(whereYouAt, videoFps);
         var currentFrameId = videoid + '-' + padFrame(currentFrame);
-        if (localStorage.getItem('taskType') === 'qa') {
-          submitQAFrame(currentFrameId, videoid)
-            .then(function (response) { showKISServerResponse('QA submit response', response, false); })
-            .catch(function (error) { if (!error.cancelled) showKISServerResponse('QA submit failed', error.message, true); });
-        } else if (localStorage.getItem('taskType') === 'kis') {
-          submitKISFrame(currentFrameId, videoid)
-            .then(function (response) { showKISServerResponse('KIS submit response', response, false); })
-            .catch(function (error) { showKISServerResponse('KIS submit failed', error.message, true); });
+        if (localStorage.getItem('taskType') === 'qa' || localStorage.getItem('taskType') === 'kis') {
+          submitVersion2({ imgId: currentFrameId, videoId: videoid });
         } else {
           res = submitAtTime(videoid, whereYouAt);
           console.log(res);
@@ -239,6 +275,10 @@
       height="480"
       playsinline
     ></video>
+    <div id="timelinePreview" hidden aria-hidden="true">
+      <img id="timelinePreviewImage" alt="" />
+      <span id="timelinePreviewTime"></span>
+    </div>
     <div id="youtubeFallback"></div>
     <button type="button" id="youtubePlayButton" aria-label="Play YouTube video" hidden disabled>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>
@@ -261,12 +301,31 @@
   </div>
 
   <div id="actions">
-    <div id="fallbackNotice">Local and media server videos are unavailable. YouTube fallback is positioned by timestamp; frame-level accuracy is approximate.</div>
+    <div id="fallbackNotice">Local video is unavailable. YouTube is positioned by timestamp; frame-level accuracy is approximate.</div>
     <button id="submit"
       title="Submit result at current play time"
       onclick="submitAtCurrentPlayTime();">
       Submit
     </button>
+  </div>
+  <section id="trakePanel" hidden aria-label="TRAKE temporal events">
+    <h2>TRAKE · Temporal events</h2>
+    <div id="trakeSlots"></div>
+    <button type="button" id="trakeAdd">+ Add event</button>
+    <button type="button" id="trakeSubmit">Review JSON</button>
+    <p id="trakeError" role="alert"></p>
+  </section>
+  <div id="trakeConfirm" class="submit-settings-modal" hidden role="dialog" aria-modal="true" aria-label="Confirm TRAKE JSON">
+    <div class="submit-settings-card">
+      <div class="submit-settings-header">Confirm TRAKE JSON</div>
+      <textarea id="trakeJson" aria-label="Editable DRES JSON" spellcheck="false"></textarea>
+      <p id="trakeConfirmError" role="alert" style="color:#a41318;min-height:18px"></p>
+      <p>Edit the JSON if needed. Submit sends it directly to DRES.</p>
+      <div class="submit-settings-actions">
+        <button type="button" id="trakeCancel">Cancel</button>
+        <button type="button" id="trakeSend" class="submit-settings-save">Submit to DRES</button>
+      </div>
+    </div>
   </div>
 
 <script type="text/javascript">
@@ -277,8 +336,8 @@
   var youtubeFallbackActive = false;
   var currentSeekTime = 0;
   var youtubeApiPromise = null;
-  var mediaIdMapPromise = null;
-  var remoteMediaBaseUrl = "https://192.168.28.151:5000/api/v2/media/";
+  var playbackInfoPromise = null;
+  var timelineKeyframes = [];
 
   function padFrame(n) {
     var s = String(Math.max(0, n | 0));
@@ -303,6 +362,67 @@
 
   function timeFromFrame(frameIdx, fps) {
     return frameIdx / fps;
+  }
+
+  function nearestTimelineKeyframe(frame) {
+    var left = 0;
+    var right = timelineKeyframes.length;
+    while (left < right) {
+      var middle = (left + right) >> 1;
+      if (timelineKeyframes[middle].frame < frame) left = middle + 1;
+      else right = middle;
+    }
+    if (left === 0) return timelineKeyframes[0];
+    if (left === timelineKeyframes.length) return timelineKeyframes[left - 1];
+    return frame - timelineKeyframes[left - 1].frame <= timelineKeyframes[left].frame - frame
+      ? timelineKeyframes[left - 1] : timelineKeyframes[left];
+  }
+
+  function initTimelinePreview(videoId) {
+    var progress = myPlayer.el().querySelector(".vjs-progress-control");
+    if (!progress) return;
+    var preview = document.getElementById("timelinePreview");
+    var image = document.getElementById("timelinePreviewImage");
+    var label = document.getElementById("timelinePreviewTime");
+    var currentName = "";
+    fetch(urlVBSService.replace(/\/$/, "") + "/getAllVideoKeyframes/?videoId=" + encodeURIComponent(videoId))
+      .then(function (response) { if (!response.ok) throw new Error("Keyframes unavailable"); return response.json(); })
+      .then(function (names) {
+        timelineKeyframes = (Array.isArray(names) ? names : []).map(function (name) {
+          var stem = String(name).replace(/\.(?:jpe?g|png|webp)$/i, "");
+          var match = stem.match(/-(\d+)$/);
+          return match ? { name: stem, frame: Number(match[1]) } : null;
+        }).filter(function (item) { return item && isFinite(item.frame); })
+          .sort(function (a, b) { return a.frame - b.frame; });
+      }).catch(function () { timelineKeyframes = []; });
+
+    image.onerror = function () {
+      if (image.dataset.fallback !== "true") {
+        image.dataset.fallback = "true";
+        image.src = keyFramesUrl + encodeURIComponent(videoId) + "/" + encodeURIComponent(currentName) + ".jpg";
+      } else preview.hidden = true;
+    };
+    progress.addEventListener("mousemove", function (event) {
+      var duration = myPlayer.duration();
+      if (!timelineKeyframes.length || !isFinite(duration) || duration <= 0) return;
+      var bar = progress.querySelector(".vjs-progress-holder") || progress;
+      var barRect = bar.getBoundingClientRect();
+      var wrapRect = document.getElementById("videoWrap").getBoundingClientRect();
+      var fraction = Math.min(1, Math.max(0, (event.clientX - barRect.left) / barRect.width));
+      var time = fraction * duration;
+      var nearest = nearestTimelineKeyframe(ffmpegFrameIndex(time, videoFps));
+      if (!nearest) return;
+      label.textContent = formatClock(time) + " · frame " + nearest.frame;
+      preview.style.bottom = Math.max(0, wrapRect.bottom - barRect.top + 8) + "px";
+      if (currentName !== nearest.name) {
+        currentName = nearest.name;
+        image.dataset.fallback = "false";
+        image.src = thumbnailUrl + encodeURIComponent(videoId) + "/" + encodeURIComponent(currentName) + ".webp";
+      }
+      preview.hidden = false;
+      preview.style.left = Math.max(0, Math.min(wrapRect.width - preview.offsetWidth, event.clientX - wrapRect.left - preview.offsetWidth / 2)) + "px";
+    });
+    progress.addEventListener("mouseleave", function () { preview.hidden = true; });
   }
 
   function updateHud() {
@@ -335,6 +455,7 @@
 
   function seekByFrames(deltaFrames) {
     if (!myPlayer && !youtubePlayer) return;
+    if (youtubeFallbackActive && !youtubePlayer) return;
     if (!youtubeFallbackActive) myPlayer.pause();
     var t = youtubeFallbackActive
       ? (youtubePlayer.getCurrentTime() || currentSeekTime)
@@ -366,8 +487,21 @@
   }
 
   function getYoutubeVideoId(url) {
-    var match = String(url || "").match(/[?&]v=([^&#]+)/) || String(url || "").match(/youtu\.be\/([^?&#]+)/);
-    return match ? match[1] : "";
+    try {
+      var parsed = new URL(url);
+      var host = parsed.hostname.toLowerCase();
+      var id = "";
+      if (host === "youtu.be" || host === "www.youtu.be") {
+        id = parsed.pathname.split("/")[1];
+      } else if (host === "youtube.com" || host === "www.youtube.com" || host === "m.youtube.com") {
+        var parts = parsed.pathname.split("/");
+        id = parts[1] === "watch" ? parsed.searchParams.get("v") :
+          (parts[1] === "live" || parts[1] === "shorts" || parts[1] === "embed" ? parts[2] : "");
+      }
+      return /^[A-Za-z0-9_-]{11}$/.test(id) ? id : "";
+    } catch (error) {
+      return "";
+    }
   }
 
   function loadYoutubeApi() {
@@ -404,84 +538,73 @@
     youtubePlayer.playVideo();
   }
 
-  function loadMediaIdMap() {
-    if (mediaIdMapPromise) return mediaIdMapPromise;
-    mediaIdMapPromise = fetch("video_clb.json", { cache: "no-cache" })
-      .then(function (response) {
-        if (!response.ok) throw new Error("Unable to load video_clb.json");
-        return response.json();
-      });
-    return mediaIdMapPromise;
-  }
-
-  function switchToRemoteMedia(videoId, seekTime) {
-    loadMediaIdMap().then(function (mediaIdMap) {
-      var mediaId = mediaIdMap && mediaIdMap[videoId];
-      if (!mediaId) {
-        switchToYoutube(videoId, seekTime);
-        return;
-      }
-
-      myPlayer.one("error", function () {
-        switchToYoutube(videoId, seekTime);
-      });
-      myPlayer.src({
-        type: "video/mp4",
-        src: remoteMediaBaseUrl + encodeURIComponent(mediaId),
-      });
-      myPlayer.load();
-    }).catch(function () {
-      switchToYoutube(videoId, seekTime);
+  function loadPlaybackInfo(videoId) {
+    if (playbackInfoPromise) return playbackInfoPromise;
+    playbackInfoPromise = fetch(
+      urlVBSService + "/getVideoPlaybackInfo?videoId=" + encodeURIComponent(videoId)
+    ).then(function (response) {
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      return response.json();
+    }).then(function (info) {
+      var fps = Number(info.fps);
+      if (isFinite(fps) && fps > 0) videoFps = fps;
+      updateHud();
+      return info;
     });
+    return playbackInfoPromise;
   }
 
   function switchToYoutube(videoId, seekTime) {
-    var youtubeUrl = (window.videoYoutubeUrls || {})[videoId];
-    var youtubeId = getYoutubeVideoId(youtubeUrl);
-    if (!youtubeId) {
-      document.getElementById("fallbackNotice").textContent = "Local and media server videos are unavailable, and no YouTube URL was found for this video.";
+    loadPlaybackInfo(videoId).then(function (info) {
+      var youtubeId = getYoutubeVideoId(info.watch_url);
+      if (!youtubeId) throw new Error("No valid YouTube watch_url in media-info for " + videoId);
+      youtubeFallbackActive = true;
+      currentSeekTime = seekTime;
+      myPlayer.pause();
+      myPlayer.el().style.display = "none";
+      document.getElementById("youtubeFallback").style.display = "block";
       document.getElementById("fallbackNotice").style.display = "block";
-      return;
-    }
-    youtubeFallbackActive = true;
-    currentSeekTime = seekTime;
-    myPlayer.pause();
-    myPlayer.el().style.display = "none";
-    document.getElementById("youtubeFallback").style.display = "block";
-    document.getElementById("fallbackNotice").style.display = "block";
-    var youtubePlayButton = document.getElementById("youtubePlayButton");
-    youtubePlayButton.hidden = false;
-    youtubePlayButton.disabled = true;
-    loadYoutubeApi().then(function () {
-      youtubePlayer = new YT.Player("youtubeFallback", {
-        videoId: youtubeId,
-        playerVars: {
-          autoplay: 0,
-          controls: 1,
-          disablekb: 0,
-          fs: 1,
-          playsinline: 1,
-          rel: 0,
-          start: Math.max(0, Math.floor(seekTime)),
-        },
-        events: {
-          onReady: function (event) {
-            event.target.unMute();
-            event.target.seekTo(seekTime, true);
-            event.target.pauseVideo();
-            updateYoutubePlayButton(YT.PlayerState.PAUSED);
-            updateHud();
+      var youtubePlayButton = document.getElementById("youtubePlayButton");
+      youtubePlayButton.hidden = false;
+      youtubePlayButton.disabled = true;
+      loadYoutubeApi().then(function () {
+        youtubePlayer = new YT.Player("youtubeFallback", {
+          videoId: youtubeId,
+          playerVars: {
+            autoplay: 0,
+            controls: 1,
+            disablekb: 0,
+            fs: 1,
+            playsinline: 1,
+            rel: 0,
+            start: Math.max(0, Math.floor(seekTime)),
           },
-          onStateChange: function (event) {
-            updateYoutubePlayButton(event.data);
-            updateHud();
+          events: {
+            onReady: function (event) {
+              event.target.unMute();
+              event.target.seekTo(seekTime, true);
+              event.target.pauseVideo();
+              updateYoutubePlayButton(YT.PlayerState.PAUSED);
+              updateHud();
+            },
+            onStateChange: function (event) {
+              updateYoutubePlayButton(event.data);
+              updateHud();
+            },
+            onError: function () {
+              document.getElementById("fallbackNotice").textContent = "YouTube could not play this video.";
+              youtubePlayButton.hidden = true;
+            },
           },
-        },
+        });
+        startHudLoop();
+      }).catch(function () {
+        youtubePlayButton.hidden = true;
+        document.getElementById("fallbackNotice").textContent = "Unable to load the YouTube fallback player.";
       });
-      startHudLoop();
-    }).catch(function () {
-      youtubePlayButton.hidden = true;
-      document.getElementById("fallbackNotice").textContent = "Unable to load the YouTube fallback player.";
+    }).catch(function (error) {
+      document.getElementById("fallbackNotice").textContent = "Local video is unavailable: " + error.message;
+      document.getElementById("fallbackNotice").style.display = "block";
     });
   }
 
@@ -497,18 +620,15 @@
       } catch (err) {}
     }
 
-    var fpsRaw = getFps(videoId);
-    var parsedFps = parseFloat(fpsRaw);
-    if (isFinite(parsedFps) && parsedFps > 0) {
-      videoFps = parsedFps;
-    }
-
     var seekTime = t;
-    if (frameID) {
+    if ((!isFinite(seekTime) || seekTime < 0) && frameID) {
       var selected = parseFloat(getField(frameID, "selectedtime"));
       if (isFinite(selected) && selected >= 0) seekTime = selected;
     }
     if (!isFinite(seekTime) || seekTime < 0) seekTime = 0;
+
+    // Start metadata loading while the browser checks the local MP4.
+    loadPlaybackInfo(videoId).catch(function () {});
 
     // Không dùng data-setup — tránh init Video.js 2 lần (gây lỗi nút play/pause)
     myPlayer = videojs("vbsvideo", {
@@ -530,11 +650,12 @@
       },
     });
 
-    myPlayer.src({ type: "video/mp4", src: url });
-
     myPlayer.one("error", function () {
-      switchToRemoteMedia(videoId, seekTime);
+      switchToYoutube(videoId, seekTime);
     });
+
+    if (url) myPlayer.src({ type: "video/mp4", src: url });
+    else switchToYoutube(videoId, seekTime);
 
     function startAtSeek() {
       var duration = myPlayer.duration();
@@ -553,6 +674,7 @@
 
     // Fallback nếu metadata đã sẵn / event đã qua
     myPlayer.ready(function () {
+      initTimelinePreview(videoId);
       if (myPlayer.readyState() >= 1) {
         startAtSeek();
         startHudLoop();

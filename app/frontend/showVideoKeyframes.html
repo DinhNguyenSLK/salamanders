@@ -10,7 +10,7 @@
 	<link rel="stylesheet" href="css/jquery-ui.min.css">
 	<link rel="stylesheet" href="css/fontawesome.min.css">
 	<link rel="stylesheet" href="css/bootstrap.css">
-	<link rel="stylesheet" href="css/visione.css?v=25">
+	<link rel="stylesheet" href="css/visione.css?v=host1">
 	<link rel="stylesheet" href="css/customSubmission.css?v=1">
 	<style>
 		/* Override main UI lock — this page needs normal document scroll */
@@ -317,12 +317,18 @@
 	<script src="js/jquery-3.3.1.min.js"></script>
 	<script src="js/jquery-ui.min.js"></script>
 	<script src="js/js-yaml.min.js"></script>
-	<script src="js/visione.js?v=24"></script>
-	<script src="js/customSubmission.js?v=1"></script>
+	<script src="js/visione.js?v=host1"></script>
+	<script src="js/customSubmission.js?v=host1"></script>
 	<script src="js/keyframeLoader.js?v=2"></script>
 </head>
 
 <body class="page-keyframes">
+  <style>body.trake-mode .keyframe-action-submit { display: none; }</style>
+  <script>
+    function syncKeyframeTask() { document.body.classList.toggle('trake-mode', localStorage.getItem('taskType') === 'trake'); }
+    syncKeyframeTask();
+    window.addEventListener('storage', function (event) { if (event.key === 'taskType') syncKeyframeTask(); });
+  </script>
 	<header class="keyframes-header">
 		<span class="keyframes-header-label">Video</span>
 		<a id="videoURL" class="keyframes-header-link" title="Play video" href=""></a>
@@ -362,32 +368,12 @@
 		}
 
 		function submit(imgId, videoId) {
-			if (localStorage.getItem('submissionType') === 'CUSTOM') {
-				submitVersion2({ imgId: imgId, videoId: videoId });
-				return;
-			}
-
-			if (submitFromMainWindow(imgId, videoId)) return;
-
-			if (checkQA()) {
-				submitQAFrame(imgId, videoId).then(function (response) {
-					showKISServerResponse('QA submit response', response, false);
-				}).catch(function (error) {
-					if (error.cancelled) return;
-					console.error('QA submit failed:', error);
-					showKISServerResponse('QA submit failed', error.message, true);
-				});
-				return;
-			}
-			if (submitAlert()) {
-					if (localStorage.getItem('taskType') === 'kis') {
-						submitKISFrame(imgId, videoId).then(function (response) {
-							showKISServerResponse('KIS submit response', response, false);
-						}).catch(function (error) {
-							console.error('KIS submit failed:', error);
-							showKISServerResponse('KIS submit failed', error.message, true);
-						});
-					} else if (localStorage.getItem('taskType') === 'avs')
+            const taskType = localStorage.getItem('taskType');
+            if (taskType === 'trake') return;
+            if (taskType === 'kis' || taskType === 'qa') return submitVersion2({ imgId: imgId, videoId: videoId });
+            if (submitFromMainWindow(imgId, videoId)) return;
+            if (submitAlert()) {
+                if (localStorage.getItem('taskType') === 'avs')
 						submitResult(imgId, videoId, isAsync=true);
 					else {
 						res = submitResult(imgId, videoId);

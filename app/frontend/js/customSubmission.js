@@ -1,15 +1,12 @@
 (function () {
   "use strict";
 
-  const DRES_TYPE = "DRES";
-  const CUSTOM_TYPE = "CUSTOM";
   const MAX_ZIP_BYTES = 5 * 1024 * 1024;
   const MAX_ZIP_ENTRIES = 500;
   const MAX_QUERY_BYTES = 256 * 1024;
   const MAX_TOTAL_QUERY_BYTES = 2 * 1024 * 1024;
 
   const originalOpenSubmitSettings = window.openSubmitSettings;
-  const originalSubmitVersion2 = window.submitVersion2;
 
   // Uploaded queries live only until this page is reloaded.
   let queries = [];
@@ -17,55 +14,23 @@
   let zipIsLoading = false;
   let crc32Table = null;
 
-  function getSubmissionType() {
-    return window.config?.submission?.type === CUSTOM_TYPE
-      ? CUSTOM_TYPE
-      : DRES_TYPE;
-  }
-
   function ensureSettingsUi() {
-    if (document.getElementById("customSubmitTypeOptions")) return;
-
-    const modal = document.getElementById("submitSettingsModal");
-    const card = modal && modal.querySelector(".submit-settings-card");
-    const header = card && card.querySelector(".submit-settings-header");
-    const actions = card && card.querySelector(".submit-settings-actions");
-    if (!card || !header || !actions) return;
-
-    card.classList.add("custom-submit-settings-card");
-    ["submitSessionId", "submitEvaluationId"].forEach(function (id) {
-      const input = document.getElementById(id);
-      const label = input && input.closest("label");
-      if (label) label.classList.add("dres-submit-setting");
-    });
-
-    const typeOptions = document.createElement("fieldset");
-    typeOptions.id = "customSubmitTypeOptions";
-    typeOptions.className = "custom-submit-type-options";
-    typeOptions.innerHTML =
-      '<legend>Submission type</legend>' +
-      '<label class="custom-submit-type-option"><input type="radio" name="submission-type" value="DRES" disabled><span>DRES</span></label>' +
-      '<label class="custom-submit-type-option"><input type="radio" name="submission-type" value="CUSTOM" disabled><span>CUSTOM</span></label>';
-    header.insertAdjacentElement("afterend", typeOptions);
-
-    const customSettings = document.createElement("div");
-    customSettings.id = "customSubmitSettings";
-    customSettings.className = "custom-submit-settings";
-    customSettings.hidden = true;
-    customSettings.innerHTML =
-      '<label>Query ZIP<input id="customQueryZip" type="file" accept=".zip,application/zip,application/x-zip-compressed"></label>' +
-      '<p id="customQueryZipStatus" class="custom-query-zip-status" aria-live="polite"></p>';
-    actions.insertAdjacentElement("beforebegin", customSettings);
-
+    if (document.getElementById("customQueryZip")) return;
+    let modal = document.getElementById("submitSettingsModal");
+    if (!modal) {
+      modal = document.createElement("div");
+      modal.id = "submitSettingsModal";
+      modal.className = "submit-settings-modal";
+      modal.hidden = true;
+      modal.innerHTML = '<div class="submit-settings-card"><div class="submit-settings-header">Query ZIP</div><div class="submit-settings-actions"><button type="button" onclick="closeSubmitSettings()">Close</button></div></div>';
+      document.body.appendChild(modal);
+    }
+    const actions = modal.querySelector(".submit-settings-actions");
+    const settings = document.createElement("div");
+    settings.className = "custom-submit-settings";
+    settings.innerHTML = '<label>Query ZIP<input id="customQueryZip" type="file" accept=".zip,application/zip,application/x-zip-compressed"></label><p id="customQueryZipStatus" class="custom-query-zip-status" aria-live="polite"></p>';
+    actions.insertAdjacentElement("beforebegin", settings);
     document.getElementById("customQueryZip").addEventListener("change", handleZipSelection);
-  }
-
-  function updateSettingsMode() {
-    const type = getSubmissionType();
-    const card = document.querySelector("#submitSettingsModal .submit-settings-card");
-    const customSettings = document.getElementById("customSubmitSettings");
-    if (card) card.dataset.submissionType = type;
-    if (customSettings) customSettings.hidden = type !== CUSTOM_TYPE;
   }
 
   function setZipStatus(message, state) {
@@ -94,18 +59,22 @@
   }
 
   window.openSubmitSettings = function () {
-    const result = originalOpenSubmitSettings.apply(this, arguments);
     ensureSettingsUi();
-
-    const input = document.getElementById("customQueryZip");
-    if (input) input.value = "";
-    const type = getSubmissionType();
-    const radio = document.querySelector('input[name="submission-type"][value="' + type + '"]');
-    if (radio) radio.checked = true;
-    updateSettingsMode();
+    originalOpenSubmitSettings.apply(this, arguments);
     if (!zipIsLoading) renderZipStatus();
-    return result;
   };
+
+  // Child windows can use the main tab's in-memory ZIP without moving dialogs.
+  window.getHostSubmissionQueries = function () { return queries.slice(); };
+  window.isHostSubmissionZipLoading = function () { return zipIsLoading; };
+  function querySource() {
+    if (queries.length || zipIsLoading) return window;
+    try {
+      const parent = window.opener;
+      if (parent && !parent.closed && typeof parent.getHostSubmissionQueries === "function") return parent;
+    } catch (_) {}
+    return window;
+  }
 
   async function handleZipSelection(event) {
     const input = event.currentTarget;
@@ -317,8 +286,8 @@
     return imageId;
   }
 
-  function askCustomAnswer(queryType, videoId, frameId) {
-    const availableQueries = queries.filter(function (query) {
+  function askCustomAnswer(queryType, videoId, frameId, sourceQueries) {
+    const availableQueries = sourceQueries.filter(function (query) {
       return query.query_type === queryType;
     });
     if (!availableQueries.length) {
@@ -367,7 +336,7 @@
       select.onchange = updatePreview;
       updatePreview();
       document.getElementById("customSubmissionTitle").textContent =
-        "CUSTOM " + queryType.toUpperCase() + " submission";
+        "Save " + queryType.toUpperCase() + " on host";
       document.getElementById("customSubmissionContext").textContent =
         videoId + " - frame " + frameId;
       answerField.hidden = queryType !== "qa";
@@ -401,87 +370,58 @@
     });
   }
 
-  async function loadRuntimeSubmissionConfig() {
-    const response = await fetch("js/conf.json?v=" + Date.now(), { cache: "no-store" });
-    if (!response.ok) throw new Error("Cannot load js/conf.json: HTTP " + response.status);
-    const runtimeConfig = await response.json();
-    const endpoint = String(runtimeConfig.customSubmissionUrl || "").trim();
-    const apiKey = String(runtimeConfig.customSubmissionApiKey || "").trim();
-    const serviceUrl = String(runtimeConfig.serviceUrl || "").trim().replace(/\/$/, "");
-    if (!endpoint || !apiKey || !serviceUrl) {
-      throw new Error("serviceUrl, customSubmissionUrl and customSubmissionApiKey are required in js/conf.json");
-    }
-    return {
-      endpoint: endpoint,
-      apiKey: apiKey,
-      proxyUrl: serviceUrl + "/custom-submission-proxy",
-    };
-  }
+  const pendingFrames = new Map();
 
-  function formatCustomResponse(response, body) {
-    const statusText = response.statusText ? " " + response.statusText : "";
-    return "HTTP " + response.status + statusText + "\n\n" +
-      (body || "(submission server returned an empty response)");
-  }
-
-  function buildCustomPayload(selectedItem, queryType, selection, submitter) {
+  async function saveToHost(frameId, videoId, taskType) {
+    const source = querySource();
+    if (source.isHostSubmissionZipLoading()) throw new Error("Wait for the query ZIP to finish loading.");
+    const sourceQueries = source.getHostSubmissionQueries();
+    const timestampMs = window.getFrameTimestampMs(frameId, videoId);
+    const selection = sourceQueries.length
+      ? await askCustomAnswer(taskType, videoId, frameId, sourceQueries)
+      : { query: { file_name: "manual-" + taskType, query_content: "" },
+          answer: taskType === "qa" ? await window.askQAAnswer(videoId, timestampMs) : null };
     const payload = {
       file_name: selection.query.file_name,
       query_content: selection.query.query_content,
-      img_id: getNumericImageId(selectedItem.imgId),
-      video_id: selectedItem.videoId,
-      submitter: submitter,
+      img_id: getNumericImageId(frameId), video_id: videoId, frame_id: frameId,
     };
-    if (queryType === "qa") payload.answer = selection.answer;
-    return payload;
-  }
-
-  async function submitCustomResult(selectedItem, queryType) {
-    const submitter = String(window.config?.ui?.["user-name"] || "").trim();
-    if (!submitter) throw new Error("ui.user-name is required for CUSTOM submission");
-    const selection = await askCustomAnswer(queryType, selectedItem.videoId, selectedItem.imgId);
-    const runtimeConfig = await loadRuntimeSubmissionConfig();
-    const payload = buildCustomPayload(selectedItem, queryType, selection, submitter);
-
-    window.showKISServerResponse(
-      "Submitting CUSTOM " + queryType.toUpperCase(),
-      "Waiting for the submission server response...",
-      false,
-    );
-    const response = await fetch(runtimeConfig.proxyUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        target_url: runtimeConfig.endpoint,
-        api_key: runtimeConfig.apiKey,
-        payload: payload,
-        video_id: selectedItem.videoId,
-        frame_id: selectedItem.imgId,
-      }),
-    });
-    const responseText = await response.text();
-    const serverResponse = formatCustomResponse(response, responseText);
-    if (!response.ok) throw new Error(serverResponse);
-    return serverResponse;
-  }
-
-  window.submitVersion2 = function (selectedItem) {
-    const taskType = localStorage.getItem("taskType");
-    if (getSubmissionType() !== CUSTOM_TYPE || (taskType !== "kis" && taskType !== "qa")) {
-      return originalSubmitVersion2.apply(this, arguments);
+    if (taskType === "qa") {
+      payload.timestamp_ms = timestampMs;
+      payload.answer = selection.answer;
+    } else {
+      payload.start_ms = timestampMs;
+      payload.end_ms = timestampMs;
     }
+    const configResponse = await fetch("js/conf.json?v=" + Date.now(), { cache: "no-store" });
+    if (!configResponse.ok) throw new Error("Cannot load js/conf.json: HTTP " + configResponse.status);
+    const runtime = await configResponse.json();
+    const backend = String(runtime.serviceUrl || "").trim().replace(/\/$/, "");
+    if (!backend) throw new Error("serviceUrl is missing from js/conf.json");
+    const key = window.crypto?.randomUUID ? window.crypto.randomUUID() : Date.now() + "-" + Math.random().toString(16).slice(2);
+    window.showKISServerResponse("Sending to shared host", "Saving the selected answer...", false);
+    const response = await fetch(backend + "/host-submissions", {
+      method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": key },
+      body: JSON.stringify(payload),
+    });
+    const text = await response.text();
+    let body;
+    try { body = text ? JSON.parse(text) : {}; } catch (_) { body = { detail: text }; }
+    if (!response.ok) {
+      const detail = body.detail || body.error || "HTTP " + response.status;
+      throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+    }
+    if (typeof window.refreshHostQueue === "function") await window.refreshHostQueue();
+    return "Saved on host with status " + body.status + ".";
+  }
 
-    submitCustomResult(selectedItem, taskType)
-      .then(function (response) {
-        window.showKISServerResponse("CUSTOM server response", response, false);
-      })
-      .catch(function (error) {
-        if (error.cancelled) return;
-        console.error("CUSTOM submit failed:", error);
-        window.showKISServerResponse("CUSTOM submission failed", error.message, true);
-      });
-    return null;
+  window.queueHostSubmissionFrame = function (frameId, videoId) {
+    const taskType = localStorage.getItem("taskType");
+    if (taskType !== "kis" && taskType !== "qa") return Promise.reject(new Error("Select KIS or QA to save on host."));
+    const key = JSON.stringify([taskType, videoId, frameId]);
+    if (pendingFrames.has(key)) return pendingFrames.get(key);
+    const request = saveToHost(frameId, videoId, taskType).finally(function () { pendingFrames.delete(key); });
+    pendingFrames.set(key, request);
+    return request;
   };
 })();

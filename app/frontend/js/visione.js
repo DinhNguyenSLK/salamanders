@@ -920,7 +920,9 @@ function applyRewriteToTextual(idx) {
 function loadConfig() {
   // Load current configuration from the server without browser caching.
   const cacheBust = "v=" + Date.now();
-  const promise1 = fetchWithTimeout("config.yaml?" + cacheBust, { cache: "no-store" })
+  const promise1 = fetchWithTimeout("config.yaml?" + cacheBust, {
+    cache: "no-store",
+  })
     .then((response) => {
       if (!response.ok) throw new Error("config.yaml HTTP " + response.status);
       return response.text();
@@ -1536,11 +1538,15 @@ function searchByForm() {
   for (let idx = 0; idx < tempSearchForms; idx++) {
     const panel = document.getElementById(`panel_image${idx}`);
     const url = document.getElementById(`sceneImageUrl${idx}`);
-    if (panel && (panel._imagePending || (url.value.trim() && !getSceneImage(idx)))) {
+    if (
+      panel &&
+      (panel._imagePending || (url.value.trim() && !getSceneImage(idx)))
+    ) {
       setSceneChannel(idx, "image", true, true);
-      document.getElementById(`sceneImageStatus${idx}`).textContent = panel._imagePending
-        ? "Please wait for the image to finish loading."
-        : "Enter a complete http or https image URL, or clear the field.";
+      document.getElementById(`sceneImageStatus${idx}`).textContent =
+        panel._imagePending
+          ? "Please wait for the image to finish loading."
+          : "Enter a complete http or https image URL, or clear the field.";
       return;
     }
   }
@@ -1573,7 +1579,6 @@ function setResults(data, preserveBackendOrder = rearrange) {
 }
 
 function groupResultsByVideo(data, preserveBackendOrder = rearrange) {
- 
   if (!data) return [];
   let list = data;
   if (typeof data === "string") {
@@ -1620,6 +1625,111 @@ function hideLoadingSpinner() {
 }
 
 var _searchXhr = null;
+
+function setVideoIdSearchStatus(message, state) {
+  const status = document.getElementById("videoIdSearchStatus");
+  if (!status) return;
+  status.textContent = message || "";
+  status.dataset.state = state || "";
+}
+
+function sampleVideoKeyframes(frameIds, limit) {
+  const ids = Array.from(new Set(frameIds.map(String))).sort(function (a, b) {
+    return a.localeCompare(b, undefined, { numeric: true });
+  });
+  const count = Math.min(ids.length, Math.max(1, Math.floor(Number(limit)) || 10));
+  if (count >= ids.length) return ids;
+  if (count === 1) return [ids[Math.floor((ids.length - 1) / 2)]];
+  return Array.from({ length: count }, function (_, index) {
+    return ids[Math.round(index * (ids.length - 1) / (count - 1))];
+  });
+}
+
+function searchByVideoId() {
+  const input = document.getElementById("videoIdSearchInput");
+  if (!input) return;
+
+  const videoId = input.value.trim().toUpperCase();
+  input.value = videoId;
+  if (!/^[A-Z0-9_-]{1,100}$/.test(videoId)) {
+    setVideoIdSearchStatus("Enter a valid video ID, for example L28_V023.", "error");
+    input.focus();
+    return;
+  }
+
+  if (_searchXhr && _searchXhr.readyState !== 4) {
+    try {
+      _searchXhr.abort();
+    } catch (e) {}
+  }
+
+  cancelBackgroundResultRendering();
+  resultsRenderGeneration++;
+  const generation = resultsRenderGeneration;
+  const frameLimit = numResultsPerVideo;
+  latestQuery = JSON.stringify({ videoId: videoId });
+  loadingSpinner = document.getElementById("loading-spinner");
+  if (loadingSpinner) loadingSpinner.style.display = "block";
+  setVideoIdSearchStatus("Loading video keyframes...", "loading");
+  setSearchLatency(null, "loading");
+  const requestStartedAt = performance.now();
+
+  _searchXhr = $.ajax({
+    type: "GET",
+    async: true,
+    timeout: 30000,
+    dataType: "json",
+    url:
+      urlVBSService.replace(/\/$/, "") +
+      "/getAllVideoKeyframes/?videoId=" +
+      encodeURIComponent(videoId),
+    success: function (frameIds) {
+      if (generation !== resultsRenderGeneration) return;
+      _searchXhr = null;
+      const ids = Array.isArray(frameIds) ? frameIds : [];
+      const sampledIds = sampleVideoKeyframes(ids, frameLimit);
+      const videoResults = sampledIds.map(function (frameId) {
+        return {
+          imgId: String(frameId),
+          videoId: videoId,
+          score: 0,
+        };
+      });
+      setSearchLatency(performance.now() - requestStartedAt, "ready");
+      setVideoIdSearchStatus(
+        sampledIds.length === ids.length
+          ? ids.length + (ids.length === 1 ? " keyframe" : " keyframes")
+          : sampledIds.length + " / " + ids.length + " keyframes (uniform)",
+        ids.length ? "success" : "error",
+      );
+      setResults(videoResults, true);
+    },
+    error: function (xhr, status, error) {
+      if (status === "abort" || generation !== resultsRenderGeneration) return;
+      _searchXhr = null;
+      setSearchLatency(null, "error");
+      setVideoIdSearchStatus("Could not load this video.", "error");
+      console.error(
+        "video ID search failed:",
+        status,
+        error,
+        xhr && xhr.responseText,
+      );
+      hideLoadingSpinner();
+      setResults("");
+    },
+  });
+}
+
+function initVideoIdSearch() {
+  const form = document.getElementById("videoIdSearch");
+  if (!form || form.dataset.bound === "true") return;
+  form.dataset.bound = "true";
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+    searchByVideoId();
+  });
+}
 
 function setSearchLatency(milliseconds, state) {
   const badge = document.getElementById("searchLatency");
@@ -2337,6 +2447,7 @@ function setTaskType(taskType) {
   else sessionStorage.setItem("taskType", taskType);
 
   localStorage.setItem("taskType", sessionStorage.getItem("taskType"));
+  if (document.body) document.body.dataset.task = getTaskType();
   $('input[name="option"][value="' + getTaskType() + '"]').prop(
     "checked",
     true,
@@ -2346,9 +2457,11 @@ function setTaskType(taskType) {
     true,
   );
   $("#taskTypeLabel").text(getTaskType().toUpperCase());
+  window.dispatchEvent(new Event("submission-task-changed"));
 }
 
 function submitResult(id, videoId, textAnswer = null, isAsync = false) {
+  if (getTaskType() === "trake") return;
   return $.ajax({
     type: "GET",
     async: isAsync,
@@ -2365,34 +2478,7 @@ function submitResult(id, videoId, textAnswer = null, isAsync = false) {
   }).responseText;
 }
 
-function getDresSettings() {
-  const dres = config?.dres || {};
-  return {
-    endpoint: String(dres.endpoint || "").trim().replace(/\/+$/, ""),
-    sessionId: String(dres.sessionID || "").trim(),
-    evaluationId: String(dres.evaluationID || "").trim(),
-  };
-}
-
-function getDresSubmitUrl() {
-  const { endpoint, sessionId, evaluationId } = getDresSettings();
-  if (!endpoint || !sessionId || !evaluationId) {
-    throw new Error(
-      "Configure dres.endpoint, dres.sessionID and dres.evaluationID in frontend/config.yaml before submitting.",
-    );
-  }
-  return endpoint + "/api/v2/submit/" + encodeURIComponent(evaluationId) +
-    "?session=" + encodeURIComponent(sessionId);
-}
-
 function openSubmitSettings() {
-  const { sessionId, evaluationId } = getDresSettings();
-  if (!document.getElementById("submitSettingsModal")) {
-    alert("Session ID: " + sessionId + "\nEvaluation ID: " + evaluationId);
-    return;
-  }
-  $("#submitSessionId").val(sessionId);
-  $("#submitEvaluationId").val(evaluationId);
   $("#submitSettingsModal").prop("hidden", false);
 }
 
@@ -2431,79 +2517,11 @@ function getFrameTimestampMs(frameId, videoId) {
 }
 
 function submitKISFrame(frameId, videoId) {
-  try {
-    const timestampMs = getFrameTimestampMs(frameId, videoId);
-    return submitKISValues(
-      videoId,
-      timestampMs,
-      timestampMs,
-    );
-  } catch (error) {
-    return Promise.reject(error);
-  }
-}
-
-function submitKISValues(videoId, startMs, endMs) {
-  let url;
-  try {
-    url = getDresSubmitUrl();
-  } catch (error) {
-    return Promise.reject(error);
-  }
-  const payload = {
-    answerSets: [
-      { answers: [{ mediaItemName: videoId, start: startMs, end: endMs }] },
-    ],
-  };
-  return fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  }).then(async function (response) {
-    const text = await response.text();
-    const serverResponse = formatDresServerResponse(response, text);
-    if (!response.ok) throw new Error(serverResponse);
-    return serverResponse;
-  });
-}
-
-function formatDresServerResponse(response, body) {
-  const statusText = response.statusText ? " " + response.statusText : "";
-  return (
-    "HTTP " +
-    response.status +
-    statusText +
-    "\n\n" +
-    (body || "(DRES returned an empty response)")
-  );
+  return window.queueHostSubmissionFrame(frameId, videoId);
 }
 
 function submitQAFrame(frameId, videoId) {
-  let url;
-  let timestampMs;
-  try {
-    url = getDresSubmitUrl();
-    timestampMs = getFrameTimestampMs(frameId, videoId);
-  } catch (error) {
-    return Promise.reject(error);
-  }
-
-  return askQAAnswer(videoId, timestampMs).then(function (answer) {
-    const text = answer + "-" + videoId + "-" + timestampMs;
-    const payload = {
-      answerSets: [{ answers: [{ text: text }] }],
-    };
-    return fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    }).then(async function (response) {
-      const responseText = await response.text();
-      const serverResponse = formatDresServerResponse(response, responseText);
-      if (!response.ok) throw new Error(serverResponse);
-      return serverResponse;
-    });
-  });
+  return window.queueHostSubmissionFrame(frameId, videoId);
 }
 
 function askQAAnswer(videoId, timestampMs) {
@@ -2581,6 +2599,7 @@ function showKISServerResponse(title, message, isError) {
 }
 
 function submitAtTime(videoId, time) {
+  if (getTaskType() === "trake") return;
   return $.ajax({
     type: "GET",
     async: false,
@@ -2596,47 +2615,19 @@ function submitAtTime(videoId, time) {
 }
 
 function submitVersion2(selectedItem) {
+  const taskType = localStorage.getItem("taskType");
+  if (taskType === "trake") return;
+  if (taskType === "kis" || taskType === "qa") {
+    return window.queueHostSubmissionFrame(selectedItem.imgId, selectedItem.videoId)
+      .then(function (message) { showKISServerResponse("Saved on host", message, false); })
+      .catch(function (error) {
+        if (!error.cancelled) showKISServerResponse("Host submission failed", error.message, true);
+      });
+  }
   $("#submitted_bar").css("display", "block");
   let res = null;
-  if (localStorage.getItem("taskType") === "qa") {
-    showKISServerResponse(
-      "Submitting to DRES",
-      "Waiting for the DRES server response...",
-      false,
-    );
-    submitQAFrame(selectedItem.imgId, selectedItem.videoId)
-      .then(function (response) {
-        showKISServerResponse("DRES server response", response, false);
-      })
-      .catch(function (error) {
-        if (error.cancelled) {
-          $("#kisServerResponseModal").prop("hidden", true);
-          return;
-        }
-        console.error("QA submit failed:", error);
-        showKISServerResponse("DRES submission failed", error.message, true);
-      });
-  } else {
-    if (submitAlert()) {
-      if (localStorage.getItem("taskType") === "kis") {
-        showKISServerResponse(
-          "Submitting to DRES",
-          "Waiting for the DRES server response...",
-          false,
-        );
-        submitKISFrame(selectedItem.imgId, selectedItem.videoId)
-          .then(function (response) {
-            showKISServerResponse("DRES server response", response, false);
-          })
-          .catch(function (error) {
-            console.error("KIS submit failed:", error);
-            showKISServerResponse(
-              "DRES submission failed",
-              error.message,
-              true,
-            );
-          });
-      } else if (localStorage.getItem("taskType") === "avs")
+  if (submitAlert()) {
+      if (localStorage.getItem("taskType") === "avs")
         submitResult(
           selectedItem.imgId,
           selectedItem.videoId,
@@ -2663,7 +2654,6 @@ function submitVersion2(selectedItem) {
       updateAVSInfo();
       if (localStorage.getItem("taskType") === "avs") avsHideSubmittedVideos();
       else avsHilightlighSubmittedVideos();
-    }
   }
   return res;
 }
@@ -2918,7 +2908,12 @@ function includeHTML(timeoutMs = 8000) {
   });
 }
 function sceneHasContent(idx) {
-  if (getSceneImage(idx) || document.getElementById(`sceneImageUrl${idx}`)?.value || document.getElementById(`panel_image${idx}`)?._imagePending) return true;
+  if (
+    getSceneImage(idx) ||
+    document.getElementById(`sceneImageUrl${idx}`)?.value ||
+    document.getElementById(`panel_image${idx}`)?._imagePending
+  )
+    return true;
   const fields = ["textual", "not", "ocr", "asr", "tags"];
   for (let i = 0; i < fields.length; i++) {
     if (($("#" + fields[i] + idx).val() || "").trim()) return true;
@@ -2937,7 +2932,9 @@ function sceneClean(idx) {
   const imagePanel = document.getElementById(`panel_image${idx}`);
   if (imagePanel) {
     imagePanel._previousImage = getSceneImage(idx);
-    imagePanel._previousUrl = document.getElementById(`sceneImageUrl${idx}`).value;
+    imagePanel._previousUrl = document.getElementById(
+      `sceneImageUrl${idx}`,
+    ).value;
     clearSceneImage(idx);
   }
   prevTextual[idx] = $("#textual" + idx).val() || "";
@@ -3018,8 +3015,10 @@ function sceneCleanUndo(idx) {
   if (imagePanel) {
     clearSceneImage(idx);
     renderSceneImage(idx, imagePanel._previousImage || "");
-    document.getElementById(`sceneImageUrl${idx}`).value = imagePanel._previousUrl || "";
-    if (imagePanel._previousImage || imagePanel._previousUrl) setSceneChannel(idx, "image", true);
+    document.getElementById(`sceneImageUrl${idx}`).value =
+      imagePanel._previousUrl || "";
+    if (imagePanel._previousImage || imagePanel._previousUrl)
+      setSceneChannel(idx, "image", true);
   }
   const textualVal = prevTextual[idx] || "";
   $("#textual" + idx).val(textualVal);
@@ -3658,6 +3657,7 @@ async function init() {
   initLayout();
   displayAdvanced();
   initObjectIconsPanel();
+  initVideoIdSearch();
   initResultDragScroll();
 
   var script = document.createElement("script");

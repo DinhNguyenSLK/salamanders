@@ -28,13 +28,16 @@ class Translator():
     def translate(self, text: str):
         
         try:
+            s = time.time()
             result = self.client.translate(
                 text,
                 source_language=self.source,
                 target_language=self.target
             )
+            print(time.time() - s)
             return result["translatedText"]
         except:
+            print("api translate bị lỗi - dùng thư viện")
             return translate_free(text)
     
 if __name__ == "__main__":
@@ -48,7 +51,7 @@ if __name__ == "__main__":
         s = time.perf_counter()
 
         result = tran.translate(
-            "Xin chào các bạn các bạn là ai v"
+            "Xin chào các bạn các bạn là ai v " + str(i)
         )
 
         print(
