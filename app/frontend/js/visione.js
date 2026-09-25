@@ -340,6 +340,9 @@ var textualMode = [];
 var videoType = "all";
 var topK = 1000;
 var rearrange = false;
+var representativeView = false;
+var representativeResultsAllowed = false;
+var lastResultsPreserveBackendOrder = false;
 
 //var qbeUrl = ''
 var is43 = false;
@@ -1502,6 +1505,16 @@ function toggleRearrange() {
   if (button) button.setAttribute("aria-pressed", String(rearrange));
 }
 
+function toggleRepresentativeView() {
+  if (!representativeResultsAllowed && results != null && results !== "") return;
+  representativeView = !representativeView;
+  const button = document.getElementById("representativeToggle");
+  if (button) button.setAttribute("aria-pressed", String(representativeView));
+  if (results != null && results !== "") {
+    setResults(results, lastResultsPreserveBackendOrder, representativeResultsAllowed);
+  }
+}
+
 /** Gom mọi scene temporal (có nội dung) thành 1 cặp query[] / parameters[]. */
 function collectTemporalSearchItems() {
   const queryItems = [];
@@ -1570,11 +1583,28 @@ function searchByForm() {
   search2(buildSearchPayload(queryItems, paramItems));
 }
 
-function setResults(data, preserveBackendOrder = rearrange) {
+function setResults(data, preserveBackendOrder = rearrange, allowRepresentative = false) {
   results = data;
+  lastResultsPreserveBackendOrder = preserveBackendOrder;
+  representativeResultsAllowed = allowRepresentative;
+  const button = document.getElementById("representativeToggle");
+  if (button) {
+    button.disabled = !allowRepresentative;
+    button.title = allowRepresentative
+      ? "Toggle group by video ID / one frame per video"
+      : "One frame per video is available for single queries only";
+  }
   // Unless the backend has rearranged results, collapse interleaved video
   // rounds into contiguous, score-ranked video groups.
   resultsSortedByVideo = groupResultsByVideo(data, preserveBackendOrder);
+  if (allowRepresentative && representativeView) {
+    const seenVideos = new Set();
+    resultsSortedByVideo = resultsSortedByVideo.filter(function (item) {
+      if (seenVideos.has(item.videoId)) return false;
+      seenVideos.add(item.videoId);
+      return true;
+    });
+  }
   groupResults(document.getElementById("group"));
 }
 
@@ -1796,7 +1826,7 @@ function search2(payload) {
       success: function (data) {
         _searchXhr = null;
         setSearchLatency(performance.now() - requestStartedAt, "ready");
-        setResults(data, payload.rearrange);
+        setResults(data, payload.rearrange, payload.query.length === 1);
       },
       error: function (xhr, status, error) {
         if (status === "abort") return;
@@ -2088,6 +2118,10 @@ function showResults(data) {
     //empty avsFirstCol
     //avsAutoSelected.length = 0
     $("#imgGridResults").empty();
+    $("#imgGridResults").toggleClass(
+      "representative-results",
+      representativeResultsAllowed && representativeView,
+    );
     const resultsPane = document.getElementById("results");
     if (resultsPane) resultsPane.scrollTop = 0;
     resMatrix = [];

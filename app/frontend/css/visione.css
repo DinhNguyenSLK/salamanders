@@ -2396,6 +2396,38 @@ textarea.textualquery1,
   filter: drop-shadow(0 0 4px #fff1a6);
 }
 
+.utility-representative {
+  left: 354px;
+}
+
+.utility-representative:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+#imgGridResults.representative-results.gridcontainer {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(194px, 1fr));
+  align-content: start;
+  gap: 6px;
+}
+
+#imgGridResults.representative-results > .video-result-row {
+  display: block;
+  width: 194px;
+  max-width: 100%;
+}
+
+#imgGridResults.representative-results .video-id-cell,
+#imgGridResults.representative-results > .hline {
+  display: none;
+}
+
+#imgGridResults.representative-results .video-frames-scroll {
+  overflow: visible;
+  width: 100%;
+}
+
 /* Compact top-right filter menu; it reuses the existing select and slider. */
 .utility-filter,
 .utility-model {
