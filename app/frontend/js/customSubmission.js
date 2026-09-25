@@ -12,6 +12,7 @@
   let queries = [];
   let zipName = "";
   let zipIsLoading = false;
+  let selectedKisQueryName = "";
   let crc32Table = null;
 
   function ensureSettingsUi() {
@@ -28,9 +29,12 @@
     const actions = modal.querySelector(".submit-settings-actions");
     const settings = document.createElement("div");
     settings.className = "custom-submit-settings";
-    settings.innerHTML = '<label>Query ZIP<input id="customQueryZip" type="file" accept=".zip,application/zip,application/x-zip-compressed"></label><p id="customQueryZipStatus" class="custom-query-zip-status" aria-live="polite"></p>';
+    settings.innerHTML = '<label>Query ZIP<input id="customQueryZip" type="file" accept=".zip,application/zip,application/x-zip-compressed"></label><p id="customQueryZipStatus" class="custom-query-zip-status" aria-live="polite"></p><label id="customKisQueryLabel" hidden>KIS query<select id="customKisQuerySelect" class="custom-query-select"></select></label>';
     actions.insertAdjacentElement("beforebegin", settings);
     document.getElementById("customQueryZip").addEventListener("change", handleZipSelection);
+    document.getElementById("customKisQuerySelect").addEventListener("change", function (event) {
+      selectedKisQueryName = event.target.value;
+    });
   }
 
   function setZipStatus(message, state) {
@@ -42,6 +46,21 @@
   }
 
   function renderZipStatus() {
+    const kisQueries = queries.filter(function (query) { return query.query_type === "kis"; });
+    const kisSelect = document.getElementById("customKisQuerySelect");
+    const kisLabel = document.getElementById("customKisQueryLabel");
+    kisSelect.replaceChildren();
+    kisQueries.forEach(function (query) {
+      const option = document.createElement("option");
+      option.value = query.file_name;
+      option.textContent = query.file_name + " - " + query.query_content.replace(/\s+/g, " ");
+      kisSelect.appendChild(option);
+    });
+    if (!kisQueries.some(function (query) { return query.file_name === selectedKisQueryName; })) {
+      selectedKisQueryName = kisQueries.length ? kisQueries[0].file_name : "";
+    }
+    kisSelect.value = selectedKisQueryName;
+    kisLabel.hidden = kisQueries.length < 2;
     if (!queries.length) {
       setZipStatus("Choose a ZIP containing *-kis.txt and/or *-qa.txt files.", "");
       return;
@@ -66,6 +85,10 @@
 
   // Child windows can use the main tab's in-memory ZIP without moving dialogs.
   window.getHostSubmissionQueries = function () { return queries.slice(); };
+  window.getHostKisQuery = function () {
+    return queries.find(function (query) { return query.query_type === "kis" && query.file_name === selectedKisQueryName; }) ||
+      queries.find(function (query) { return query.query_type === "kis"; });
+  };
   window.isHostSubmissionZipLoading = function () { return zipIsLoading; };
   function querySource() {
     if (queries.length || zipIsLoading) return window;
@@ -82,6 +105,7 @@
     if (!file) return;
     queries = [];
     zipName = "";
+    selectedKisQueryName = "";
     if (!file.name.toLowerCase().endsWith(".zip")) {
       setZipStatus("Only .zip files are accepted.", "error");
       input.value = "";
@@ -377,10 +401,18 @@
     if (source.isHostSubmissionZipLoading()) throw new Error("Wait for the query ZIP to finish loading.");
     const sourceQueries = source.getHostSubmissionQueries();
     const timestampMs = window.getFrameTimestampMs(frameId, videoId);
-    const selection = sourceQueries.length
-      ? await askCustomAnswer(taskType, videoId, frameId, sourceQueries)
-      : { query: { file_name: "manual-" + taskType, query_content: "" },
-          answer: taskType === "qa" ? await window.askQAAnswer(videoId, timestampMs) : null };
+    let selection;
+    if (!sourceQueries.length) {
+      selection = { query: { file_name: "manual-" + taskType, query_content: "" },
+        answer: taskType === "qa" ? await window.askQAAnswer(videoId, timestampMs) : null };
+    } else if (taskType === "kis" && sourceQueries.some(function (query) { return query.query_type === "kis"; })) {
+      const query = typeof source.getHostKisQuery === "function"
+        ? source.getHostKisQuery()
+        : sourceQueries.find(function (entry) { return entry.query_type === "kis"; });
+      selection = { query: query, answer: null };
+    } else {
+      selection = await askCustomAnswer(taskType, videoId, frameId, sourceQueries);
+    }
     const payload = {
       file_name: selection.query.file_name,
       query_content: selection.query.query_content,
