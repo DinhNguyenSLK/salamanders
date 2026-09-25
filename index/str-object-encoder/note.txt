@@ -1,0 +1,66 @@
+
+
+                    [File .jsonl.gz của nhiều Mô hình] 
+                                │
+                                ▼
+                    ┌──────────────────────────────┐
+                    │  1. Lọc và Chuẩn hóa Thô    │ ──► (Score, Diện tích, Đưa về lowercase)
+                    └────────────┬─────────────────┘
+                                ▼
+                    ┌──────────────────────────────┐
+                    │  2. Hợp nhất Đa mô hình      │ ──► (Gom kết quả các mô hình về chung 1 frame)
+                    └────────────┬─────────────────┘
+                                ▼
+                    ┌──────────────────────────────┐
+                    │  3. Mở rộng Ngữ nghĩa        │ ──► (Tra từ điển tìm nhãn cha / Hypernyms)
+                    └────────────┬─────────────────┘
+                                ▼
+                    ┌──────────────────────────────┐
+                    │  4. Lọc trùng không gian NMS │ ──► (Khử các Bounding Box chồng lấn quá nhiều)
+                    └────────────┬─────────────────┘
+                                ▼
+                    ┌──────────────────────────────┐
+                    │  5. Mã hóa chuỗi STR văn bản │ ──► (Biến Không gian & Tần suất thành Text)
+                    └────────────┬─────────────────┘
+                                ▼
+                    [File kết quả nén .jsonl.gz]  ──► Sẵn sàng đưa vào Database để Search!
+
+1. Bộ não mở rộng ngữ nghĩa (hypersets.csv)Hàm đảm nhiệm: load_hypersets & add_hypersets
+Cơ chế: Đọc từ điển phân cấp, nếu phát hiện vật thể con (ví dụ: zucchini), nó tự động "phân thân" tạo thêm các bản ghi nhãn cha 
+(vegetable, food) tại đúng vị trí đó và đánh dấu is_hyperset = True.
+Tác dụng: Hỗ trợ tính năng tìm kiếm bao hàm (gõ từ khóa cha vẫn ra ảnh chứa vật thể con).
+
+
+2. Lọc và chuẩn hóa dữ liệu thôHàm đảm nhiệm: process_single_detector_record
+Cơ chế: * Lọc loại bỏ vật thể dựa theo cấu hình Threshold độ tự tin (score) và kích thước tối thiểu của ô chứa (min_area).
+Loại bỏ các nhãn nằm trong danh sách cấm (exclude_labels).
+Đồng bộ định dạng chuỗi: Đưa về chữ thường và thay dấu cách bằng dấu gạch dưới (.lower().replace(' ', '_')).
+Ánh xạ đổi tên nhãn đồng nhất qua label_map (ví dụ: Tv $\rightarrow$ television).
+
+
+3. Đồng bộ và Hợp nhất dữ liệuHàm đảm nhiệm: process_objects_file & merge_records
+Cơ chế: Đọc tuần tự stream file nén .gz bằng Generator (tiết kiệm RAM). 
+Dùng collections.ChainMap để gộp mảng vật thể độc lập của nhiều mô hình quét (như VFNet, Faster R-CNN) trên cùng một khung hình (_id) thành một danh sách tổng.
+
+
+4. Loại bỏ hộp trùng lặp (Khử nhiễu không gian)
+Hàm đảm nhiệm: _iou, _nms, non_maximum_suppressionCơ chế: Gom nhóm vật thể theo từng mô hình và từng nhãn. 
+Tính toán tỷ lệ trùng lấn IoU để giữ lại các hộp có độ tự tin cao nhất và loại bỏ các hộp bị đè lên nhau.
+ Lưu ý: Bỏ qua không xử lý NMS đối với detector màu sắc (colors).
+ 
+ 5. Động cơ mã hóa văn bản đại diện (Surrogate Text Encoder)Đây là bước tối quan trọng để biến dữ liệu thị giác thành văn bản lưu trữ vào DB tìm kiếm.Mã hóa không gian (_str_positional_box_encode):
+ Chia bức ảnh thành lưới tọa độ $7 \times 7$ (hàng từ 0->6, cột chuyển thành ký tự từ a->g).
+ Một vật thể nằm ở ô nào sẽ sinh ra token dạng: {Hàng}{Cột}{Tên_Nhãn} (Ví dụ: 3btelevision).Mã hóa tần suất và độ tự tin (_str_count_encode):Đếm số lượng vật thể xuất hiện kèm hậu tố tần suất và mô hình trích xuất.Thêm trọng số (Heuristic boost) tăng điểm cho vật thể thật so với vật thể tự sinh từ hypernyms.
+ Mã hóa môi trường màu sắc của khung hình: 4wccolorkeyframe (ảnh màu) hoặc 4wcgraykeyframe (ảnh đen trắng/monochrome).
+ 
+ 📦 ĐỊNH DẠNG DỮ LIỆU ĐẦU RA SAU XỬ LÝ (OUTPUT STRUCTURE)
+ Sau khi qua hàm process_merged_record, cấu trúc một dòng dữ liệu lưu vào database sẽ cực kỳ gọn gàng như sau:JSON{
+  "_id": "video_001_frame_045",
+  "object_box_str": "3btelevision 3ctelevision 4btelevision 4ctelevision", 
+  "object_count_str": "4wctelevision1|6 4wccolorkeyframe",
+  "object_info_before_nms": "television1(VFN64:0.85) tv1(FRCNN:0.79)",
+  "object_info": "television1(VFN64:0.85)"
+}
+object_box_str: Chuỗi ký tự text lưu vị trí ô lưới giúp bạn thực hiện các câu lệnh tìm kiếm nâng cao như: "Tìm ảnh có television nằm ở góc trái màn hình".
+object_count_str: Chuỗi ký tự lưu tần suất và môi trường màu sắc phục vụ tìm kiếm số lượng.
+object_info: Chuỗi text readable giúp lập trình viên dễ dàng debug và kiểm tra kết quả chính xác sau khi chạy NMS.
