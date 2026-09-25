@@ -18,9 +18,8 @@ def getKeyframes(filepath):
 
 @app.route('/medium_video/<path:filepath>')
 def getMediumVideo(filepath):
-    video_filename = Path(filepath).name
-    prefix_video_id = Path(video_filename).stem.split('_', 1)[0]
-    return send_from_directory(VIDEO_ROOT / prefix_video_id, video_filename)
+    
+    return send_from_directory(collection_root / "resized-videos/medium", filepath)
 
 @app.route('/tiny_video/<path:filepath>')
 def getTinyVideo(filepath):
