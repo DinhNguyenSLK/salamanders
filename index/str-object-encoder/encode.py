@@ -411,8 +411,12 @@ def process_video_id(
     if not force and str_output_file.exists() and count_output_file.exists():
         print(f'Skipping STR object encoding, using existing file:', str_output_file.name, count_output_file.name)
         return
-    
-    assert all(i.exists() for i in objects_input_files), f"Analysis files missing for '{video_id}'. Have you run 'analyze' on it?"
+
+    for i in objects_input_files:
+        if not i.exists():
+            print(str(i), "ko ton tai")
+            return
+   
 
     # xử lý từng file objects của từng detector  
     records_per_detector = map(lambda x: process_objects_file(x, config), objects_input_files)

@@ -10,97 +10,12 @@
   let reconnectDelay = 1000;
   let memberInfo = null;
   let clearing = false;
-  const submittedDefaultWidth = 220;
-  const submittedMinWidth = 190;
-  const submittedMaxWidth = 520;
-
-  function maxSubmittedWidth() {
-    const searchSidebar = document.getElementById("searchSidebar");
-    const searchWidth = searchSidebar ? searchSidebar.getBoundingClientRect().width : 280;
-    return Math.max(
-      submittedMinWidth,
-      Math.min(submittedMaxWidth, window.innerWidth - searchWidth - 360),
-    );
-  }
-
-  function clampSubmittedWidth(value) {
-    const numeric = value === null || value === "" ? submittedDefaultWidth : Number(value);
-    const width = Number.isFinite(numeric) ? numeric : submittedDefaultWidth;
-    return Math.round(Math.min(maxSubmittedWidth(), Math.max(submittedMinWidth, width)));
-  }
-
-  function savedSubmittedWidth() {
-    return clampSubmittedWidth(localStorage.getItem("submittedSidebarWidth"));
-  }
-
-  function setSubmittedWidth(value, persist) {
-    const width = clampSubmittedWidth(value);
-    const sidebar = document.getElementById("submitted_bar");
-    const handle = document.getElementById("submittedResizeHandle");
-    if (sidebar) {
-      sidebar.style.width = width + "px";
-      sidebar.style.minWidth = width + "px";
-      sidebar.style.maxWidth = width + "px";
-    }
-    if (handle) handle.setAttribute("aria-valuenow", String(width));
-    if (persist) localStorage.setItem("submittedSidebarWidth", String(width));
-    return width;
-  }
-
-  function initSubmittedResizer() {
-    const handle = document.getElementById("submittedResizeHandle");
-    const sidebar = document.getElementById("submitted_bar");
-    const body = document.querySelector(".bodyGrid");
-    if (!handle || !sidebar || !body || handle.dataset.bound === "1") return;
-    handle.dataset.bound = "1";
-    let dragging = false;
-    let rightEdge = 0;
-    let currentWidth = setSubmittedWidth(savedSubmittedWidth(), false);
-
-    function resizeFromPointer(event) {
-      currentWidth = setSubmittedWidth(rightEdge - event.clientX, false);
-    }
-
-    function finishResize(event) {
-      if (!dragging) return;
-      dragging = false;
-      body.classList.remove("submitted-sidebar-resizing");
-      setSubmittedWidth(currentWidth, true);
-      if (handle.hasPointerCapture?.(event.pointerId)) handle.releasePointerCapture(event.pointerId);
-    }
-
-    handle.addEventListener("pointerdown", function (event) {
-      if (event.button !== 0) return;
-      event.preventDefault();
-      dragging = true;
-      rightEdge = sidebar.getBoundingClientRect().right;
-      body.classList.add("submitted-sidebar-resizing");
-      handle.setPointerCapture(event.pointerId);
-      resizeFromPointer(event);
-    });
-    handle.addEventListener("pointermove", function (event) {
-      if (dragging) resizeFromPointer(event);
-    });
-    handle.addEventListener("pointerup", finishResize);
-    handle.addEventListener("pointercancel", finishResize);
-    handle.addEventListener("dblclick", function () {
-      currentWidth = setSubmittedWidth(submittedDefaultWidth, true);
-    });
-    handle.addEventListener("keydown", function (event) {
-      let next = savedSubmittedWidth();
-      if (event.key === "ArrowLeft") next += 20;
-      else if (event.key === "ArrowRight") next -= 20;
-      else if (event.key === "Home") next = submittedMinWidth;
-      else if (event.key === "End") next = maxSubmittedWidth();
-      else return;
-      event.preventDefault();
-      currentWidth = setSubmittedWidth(next, true);
-    });
-    window.addEventListener("resize", function () {
-      currentWidth = setSubmittedWidth(savedSubmittedWidth(), false);
-    });
-  }
-
+  let initialized = false;
+  let refreshing = false;
+  let revision = 0;
+  let realtimeReady = false;
+  let pingTimer = null;
+  const sending = new Set();
   function queueVisible() {
     const task = localStorage.getItem("taskType");
     return task === "kis" || task === "qa";
@@ -134,7 +49,7 @@
     let answer;
     if (String(item.taskType).toLowerCase() === "qa") {
       answer = {
-        text: String(item.answer || "").trim() + "-" + item.videoId + "-" + item.timestampMs,
+        text: "QA-" + String(item.answer || "").trim() + "-" + item.videoId + "-" + item.timestampMs,
       };
     } else {
       answer = {
@@ -150,32 +65,44 @@
     return editedPayloads.has(item.id) ? editedPayloads.get(item.id) : defaultDresPayload(item);
   }
 
-  async function copyDresPayload(item, button) {
-    const text = JSON.stringify(payloadFor(item), null, 2);
-    try {
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(text);
-      } else {
-        const temporary = document.createElement("textarea");
-        temporary.value = text;
-        temporary.setAttribute("readonly", "");
-        temporary.style.position = "fixed";
-        temporary.style.opacity = "0";
-        document.body.appendChild(temporary);
-        temporary.select();
-        const copied = document.execCommand("copy");
-        temporary.remove();
-        if (!copied) throw new Error("The browser denied clipboard access.");
+  async function copyPayloadText(text) {
+    if (window.isSecureContext && window.navigator?.clipboard?.writeText) {
+      try {
+        await window.navigator.clipboard.writeText(text);
+        return;
+      } catch (_) {
+        // Some browsers block the Clipboard API but still allow selection copying.
       }
-      button.textContent = "Copied ✓";
-      button.classList.add("is-copied");
+    }
+    const previousFocus = document.activeElement;
+    const field = document.createElement("textarea");
+    field.value = text;
+    field.readOnly = true;
+    field.style.cssText = "position:fixed;left:-9999px;top:0;opacity:0;font-size:16px;";
+    document.body.appendChild(field);
+    try {
+      field.focus();
+      field.select();
+      if (!document.execCommand("copy")) throw new Error("The browser denied clipboard access.");
+    } finally {
+      field.remove();
+      if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+    }
+  }
+
+  async function copyDresPayload(item, button) {
+    if (button.disabled) return;
+    button.disabled = true;
+    try {
+      await copyPayloadText(JSON.stringify(payloadFor(item), null, 2));
+      button.textContent = "Copied!";
       window.setTimeout(function () {
-        if (!button.isConnected) return;
-        button.textContent = "Copy JSON";
-        button.classList.remove("is-copied");
+        if (button.isConnected) button.textContent = "Copy JSON";
       }, 1600);
     } catch (error) {
       window.showKISServerResponse("Cannot copy JSON", error.message, true);
+    } finally {
+      button.disabled = false;
     }
   }
 
@@ -241,15 +168,19 @@
     const visible = queueVisible();
     panel.hidden = !visible;
     if (avsPanel) avsPanel.hidden = visible;
-    if (!visible) return;
+    const clearButton = document.getElementById("hostQueueClear");
+    if (clearButton) clearButton.hidden = !(visible && memberInfo?.isAdmin && records.size);
+    if (!visible) {
+      const count = document.getElementById("submitted_num");
+      if (count && typeof avsSubmitted !== "undefined") count.textContent = String(avsSubmitted.size);
+      return;
+    }
     sidebar.style.display = "block";
     const items = Array.from(records.values()).sort(function (a, b) {
       return Date.parse(b.createdAt) - Date.parse(a.createdAt);
     });
     const count = document.getElementById("submitted_num");
     if (count) count.textContent = String(items.length);
-    const clearButton = document.getElementById("hostQueueClear");
-    if (clearButton) clearButton.hidden = !(visible && memberInfo?.isAdmin && items.length);
     const list = document.getElementById("hostQueueList");
     list.replaceChildren();
     if (!items.length) {
@@ -258,21 +189,68 @@
     }
     items.forEach(function (item) {
       const card = createText("article", "host-queue-item", "");
-      card.appendChild(createText("strong", "", item.fileName || item.taskType.toUpperCase()));
-      card.appendChild(createText("div", "", item.videoId + " · " + (item.frameId || item.imageId)));
-      card.appendChild(createText("div", "host-queue-submitter", item.createdBy));
-      if (item.answer) card.appendChild(createText("div", "", "Answer: " + item.answer));
+      const frameId = String(item.frameId || item.imageId || "").replace(/\.(?:jpe?g|png|webp)$/i, "");
+      const result = {
+        videoId: item.videoId,
+        imgId: frameId,
+        frameName: frameId,
+        videoUrl: (window.videoUrlPrefix || "") + item.videoId + ".mp4",
+        thumb: item.hasImage ? serviceUrl + "/host-submissions/" + encodeURIComponent(item.id) + "/image" : "",
+      };
+      const meta = createText("div", "host-queue-meta", "");
+      meta.title = (item.fileName || "") + " ? " + frameId + " ? " + item.status;
+      meta.appendChild(createText("span", "host-queue-task", String(item.taskType || "").toLowerCase()));
+      meta.appendChild(createText("span", "", " - "));
+      const frameLink = createText("a", "host-queue-frame-id", frameId);
+      frameLink.href = "indexedData.html?videoId=" + encodeURIComponent(item.videoId) + "&id=" + encodeURIComponent(frameId);
+      frameLink.target = "_blank";
+      frameLink.rel = "noopener";
+      frameLink.title = "View image information: " + frameId;
+      frameLink.addEventListener("click", function () { window.markResultLightboxItemAsViewed(result); });
+      meta.appendChild(frameLink);
+      meta.appendChild(createText("span", "", " - "));
+      meta.appendChild(createText("span", "host-queue-item-status", item.status));
+      card.appendChild(meta);
+      const media = createText("div", "host-queue-media", "");
+      const author = createText("span", "host-queue-submitter", item.createdBy);
+      author.title = "Submitted by " + item.createdBy;
       if (item.hasImage) {
         const image = document.createElement("img");
         image.loading = "lazy";
-        image.alt = item.frameId || item.videoId;
-        image.src = serviceUrl + "/host-submissions/" + encodeURIComponent(item.id) + "/image";
-        card.appendChild(image);
+        image.decoding = "async";
+        image.alt = frameId || item.videoId;
+        image.src = result.thumb;
+        media.appendChild(image);
       }
+      media.appendChild(author);
+      const toolbar = createText("div", "host-queue-media-tools", "");
+      function addMediaAction(label, iconClass, handler) {
+        const action = createText("button", "host-queue-media-action", "");
+        action.type = "button";
+        action.title = label;
+        action.setAttribute("aria-label", label);
+        const icon = createText("i", "fas " + iconClass, "");
+        icon.setAttribute("aria-hidden", "true");
+        action.appendChild(icon);
+        action.addEventListener("click", handler);
+        toolbar.appendChild(action);
+      }
+      if (frameId && item.videoId) {
+        addMediaAction("Nearly keyframes", "fa-th-large", function () { window.openNearbyKeyframes(result); });
+        addMediaAction("Play video", "fa-play", function () { window.playVideoWindow(result.videoUrl, item.videoId, frameId); });
+        addMediaAction("Image similarity", "fa-clone", function () {
+          window.searchByLink(window.isAdvanced === false ? { comboVisualSim: frameId } : { vf: frameId });
+        });
+      }
+      media.appendChild(toolbar);
+      card.appendChild(media);
+      if (item.answer) card.appendChild(createText("div", "host-queue-answer", "Answer: " + item.answer));
       if (item.status === "pending" || item.status === "failed") {
         const actions = createText("div", "host-queue-actions", "");
-        const button = createText("button", "host-queue-submit", "Submit to DRES");
+        const button = createText("button", "host-queue-submit", "Submit");
         button.type = "button";
+        button.title = "Submit to DRES";
+        button.disabled = sending.has(item.id);
         button.addEventListener("click", function () { submitToDres(item, button); });
         const editButton = createText(
           "button",
@@ -280,16 +258,17 @@
           editedPayloads.has(item.id) ? "Edit ✓" : "Edit",
         );
         editButton.type = "button";
+        editButton.disabled = sending.has(item.id);
         editButton.addEventListener("click", async function () {
           if (await editDresPayload(item)) render();
         });
-        const copyButton = createText("button", "host-queue-copy", "Copy JSON");
-        copyButton.type = "button";
-        copyButton.addEventListener("click", function () {
-          copyDresPayload(item, copyButton);
-        });
         actions.appendChild(button);
         actions.appendChild(editButton);
+        const copyButton = createText("button", "host-queue-copy", "Copy JSON");
+        copyButton.type = "button";
+        copyButton.title = "Copy DRES JSON, including saved edits";
+        copyButton.disabled = sending.has(item.id);
+        copyButton.addEventListener("click", function () { return copyDresPayload(item, copyButton); });
         actions.appendChild(copyButton);
         card.appendChild(actions);
       }
@@ -298,22 +277,35 @@
   }
 
   async function refresh() {
-    if (!serviceUrl) return;
+    if (!serviceUrl || refreshing) return;
+    refreshing = true;
     try {
+      if (!memberInfo) memberInfo = await request("/me");
+      const before = revision;
       const items = await request("");
+      // A realtime/local change after this snapshot started is newer.
+      if (before !== revision) return;
       records.clear();
       items.forEach(function (item) { records.set(item.id, item); });
+      for (const id of editedPayloads.keys()) {
+        if (!records.has(id) || records.get(id).status === "submitted") editedPayloads.delete(id);
+      }
       render();
-      setStatus("Live host queue");
+      setStatus(realtimeReady ? "Live host queue" : "Host queue refreshed; realtime reconnecting...");
     } catch (error) {
       setStatus(error.message);
+    } finally {
+      refreshing = false;
     }
   }
 
   async function submitToDres(item, button) {
+    if (sending.has(item.id)) return;
     if (!confirm("Submit " + item.fileName + " to DRES now?")) return;
+    sending.add(item.id);
     button.disabled = true;
     button.textContent = "Submitting...";
+    render();
     try {
       const options = {
         method: "POST",
@@ -324,6 +316,7 @@
       }
       const result = await request("/" + encodeURIComponent(item.id) + "/submit-dres", options);
       const saved = result.submission;
+      revision++;
       if (saved) records.set(saved.id, saved);
       if (saved && saved.status === "submitted") editedPayloads.delete(saved.id);
       render();
@@ -336,7 +329,9 @@
       await refresh();
       window.showKISServerResponse("DRES submit needs review", error.message, true);
     } finally {
+      sending.delete(item.id);
       button.disabled = false;
+      render();
     }
   }
 
@@ -379,6 +374,7 @@
     if (button) button.disabled = true;
     try {
       const result = await request("", { method: "DELETE" });
+      revision++;
       records.clear();
       editedPayloads.clear();
       render();
@@ -411,20 +407,27 @@
       socket.onopen = function () {
         reconnectDelay = 1000;
         socket.send(JSON.stringify({ protocol: "json", version: 1 }) + separator);
+        clearInterval(pingTimer);
+        pingTimer = setInterval(function () {
+          if (socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 6 }) + separator);
+        }, 15000);
       };
       socket.onmessage = function (event) {
         String(event.data).split(separator).filter(Boolean).forEach(function (part) {
           let message;
           try { message = JSON.parse(part); } catch (_) { return; }
           if (message.type === 1 && message.target === "ready") {
+            realtimeReady = true;
             refresh();
           } else if (message.type === 1 && message.target === "submissionChanged") {
             const item = message.arguments?.[0]?.submission;
             if (item && (!records.has(item.id) || records.get(item.id).version <= item.version)) {
+              revision++;
               records.set(item.id, item);
               render();
             }
           } else if (message.type === 1 && message.target === "submissionsCleared") {
+            revision++;
             records.clear();
             editedPayloads.clear();
             render();
@@ -435,21 +438,41 @@
         });
       };
       socket.onerror = function () { socket.close(); };
-      socket.onclose = scheduleReconnect;
+      socket.onclose = function () {
+        realtimeReady = false;
+        clearInterval(pingTimer);
+        scheduleReconnect();
+      };
     } catch (error) {
       setStatus(error.message);
       scheduleReconnect();
     }
   }
 
+  // Bind independently of host connectivity; collapsing also works for AVS.
+  const submissionToggle = document.getElementById("submissionToggle");
+  if (submissionToggle) {
+    let collapsed = false;
+    submissionToggle.addEventListener("click", function () {
+      collapsed = !collapsed;
+      document.getElementById("submitted_bar").setAttribute("data-collapsed", String(collapsed));
+      submissionToggle.setAttribute("aria-expanded", String(!collapsed));
+      const label = collapsed ? "Show submission panel" : "Hide submission panel";
+      submissionToggle.setAttribute("aria-label", label);
+      submissionToggle.title = label;
+      submissionToggle.textContent = collapsed ? "\u2039" : "\u203a";
+    });
+  }
+
   window.refreshHostQueue = refresh;
   window.initHostQueue = async function () {
+    if (initialized) return;
     const response = await fetch("js/conf.json", { cache: "no-store" });
+    if (!response.ok) throw new Error("Cannot load js/conf.json: HTTP " + response.status);
     const config = await response.json();
     serviceUrl = String(config.serviceUrl || "").trim().replace(/\/$/, "");
     if (!serviceUrl) throw new Error("serviceUrl is not configured");
-    initSubmittedResizer();
-    memberInfo = await request("/me");
+    initialized = true;
     const clearButton = document.getElementById("hostQueueClear");
     if (clearButton) clearButton.addEventListener("click", clearAll);
     render();
@@ -459,5 +482,6 @@
     window.addEventListener("storage", function (event) {
       if (event.key === "taskType") render();
     });
+    window.addEventListener("submission-task-changed", render);
   };
 })();

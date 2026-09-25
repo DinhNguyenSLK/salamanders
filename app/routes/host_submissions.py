@@ -1,6 +1,7 @@
 """Salamanders' server-side bridge to the shared submit_all host and DRES."""
 
 from base64 import b64encode
+from copy import deepcopy
 import json
 from pathlib import Path
 import re
@@ -25,8 +26,8 @@ DRES_TIMEOUT = 35
 
 
 class CreateSubmission(BaseModel):
-    file_name: str = Field(min_length=1, max_length=255)
-    query_content: str = Field(default="", max_length=4096)
+    file_name: str = Field(min_length=1, max_length=259)
+    query_content: str = Field(default="", max_length=256 * 1024)
     img_id: int = Field(ge=0)
     video_id: str
     frame_id: str
@@ -96,6 +97,20 @@ def checked_host_response(response: requests.Response) -> Any:
     if not 200 <= response.status_code < 300:
         raise HTTPException(status_code=response.status_code, detail=body)
     return body
+
+
+def default_dres_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Keep the local QA format when the shared host returns an older payload.
+
+    Explicitly edited JSON bypasses this conversion. KIS answers have no text.
+    """
+    result = deepcopy(payload)
+    for answer_set in result.get("answerSets", []):
+        for answer in answer_set.get("answers", []):
+            value = answer.get("text")
+            if isinstance(value, str) and not value.startswith("QA-"):
+                answer["text"] = "QA-" + value
+    return result
 
 
 def load_keyframe(video_id: str, frame_id: str) -> str | None:
@@ -199,7 +214,7 @@ def submit_to_dres(
         "POST", f"submissions/{submission_id}/claim", settings,
     ))
     token = claim["claimToken"]
-    dres_payload = edited_payload if edited_payload is not None else claim["dresPayload"]
+    dres_payload = edited_payload if edited_payload is not None else default_dres_payload(claim["dresPayload"])
     dres_url = f"{endpoint}/api/v2/submit/{evaluation_id}"
     outcome_certain = True
     accepted = False

@@ -3,6 +3,7 @@ from fastapi.responses import PlainTextResponse
 from typing import Annotated, Any
 from pathlib import Path
 import json
+import re
 from elasticsearch import AsyncElasticsearch, NotFoundError
 
 from search_engine import get_es_client
@@ -33,6 +34,7 @@ FIELD_ALIASES = {
 }
 
 index_name = settings.ES_INDEX
+VIDEO_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
 
 
 def _format_field_value(value: Any) -> str:
@@ -97,3 +99,26 @@ async def get_fps(
     if fps is None:
         raise HTTPException(status_code=404, detail="media-info không có trường fps")
     return PlainTextResponse(str(fps))
+
+
+@router.get("/getVideoPlaybackInfo")
+async def get_video_playback_info(
+    videoId: Annotated[str, Query()],
+) -> dict[str, Any]:
+    """Return only the fields the player needs from media-info."""
+    if not VIDEO_ID_PATTERN.fullmatch(videoId):
+        raise HTTPException(status_code=422, detail="Invalid videoId")
+
+    info_path = Path(settings.MEDIA_INFO_DIR) / f"{videoId}.json"
+    if not info_path.is_file():
+        raise HTTPException(status_code=404, detail=f"No media-info for videoId={videoId}")
+
+    try:
+        with info_path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError) as error:
+        raise HTTPException(status_code=500, detail="Could not read media-info") from error
+
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=500, detail="Invalid media-info")
+    return {"fps": data.get("fps"), "watch_url": data.get("watch_url")}

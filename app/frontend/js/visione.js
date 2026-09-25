@@ -389,13 +389,7 @@ function syncCanvasAliases() {
 }
 
 function ensureSceneState(idx) {
-  const defaultMode =
-    config &&
-    config.ui &&
-    config.ui["textual-modes"] &&
-    config.ui["textual-modes"][0]
-      ? config.ui["textual-modes"][0].mode
-      : "all";
+  const defaultMode = defaultTextualMode();
   while (textualMode.length <= idx) textualMode.push(defaultMode);
   while (occur.length <= idx) occur.push("and");
   while (isCanvasEnabled.length <= idx) isCanvasEnabled.push(true);
@@ -525,7 +519,6 @@ function removeLastSearchScene() {
   }
   syncCanvasAliases();
   refreshSceneChrome();
-  searchByForm();
 }
 
 function initSearchScenes() {
@@ -925,9 +918,11 @@ function applyRewriteToTextual(idx) {
 }
 
 function loadConfig() {
-  // Bust browser cache so ui.textual-modes renames (e.g. clip → openclip) show up.
+  // Load current configuration from the server without browser caching.
   const cacheBust = "v=" + Date.now();
-  const promise1 = fetchWithTimeout("config.yaml?" + cacheBust)
+  const promise1 = fetchWithTimeout("config.yaml?" + cacheBust, {
+    cache: "no-store",
+  })
     .then((response) => {
       if (!response.ok) throw new Error("config.yaml HTTP " + response.status);
       return response.text();
@@ -1543,11 +1538,15 @@ function searchByForm() {
   for (let idx = 0; idx < tempSearchForms; idx++) {
     const panel = document.getElementById(`panel_image${idx}`);
     const url = document.getElementById(`sceneImageUrl${idx}`);
-    if (panel && (panel._imagePending || (url.value.trim() && !getSceneImage(idx)))) {
+    if (
+      panel &&
+      (panel._imagePending || (url.value.trim() && !getSceneImage(idx)))
+    ) {
       setSceneChannel(idx, "image", true, true);
-      document.getElementById(`sceneImageStatus${idx}`).textContent = panel._imagePending
-        ? "Please wait for the image to finish loading."
-        : "Enter a complete http or https image URL, or clear the field.";
+      document.getElementById(`sceneImageStatus${idx}`).textContent =
+        panel._imagePending
+          ? "Please wait for the image to finish loading."
+          : "Enter a complete http or https image URL, or clear the field.";
       return;
     }
   }
@@ -1580,7 +1579,6 @@ function setResults(data, preserveBackendOrder = rearrange) {
 }
 
 function groupResultsByVideo(data, preserveBackendOrder = rearrange) {
- 
   if (!data) return [];
   let list = data;
   if (typeof data === "string") {
@@ -1635,6 +1633,18 @@ function setVideoIdSearchStatus(message, state) {
   status.dataset.state = state || "";
 }
 
+function sampleVideoKeyframes(frameIds, limit) {
+  const ids = Array.from(new Set(frameIds.map(String))).sort(function (a, b) {
+    return a.localeCompare(b, undefined, { numeric: true });
+  });
+  const count = Math.min(ids.length, Math.max(1, Math.floor(Number(limit)) || 10));
+  if (count >= ids.length) return ids;
+  if (count === 1) return [ids[Math.floor((ids.length - 1) / 2)]];
+  return Array.from({ length: count }, function (_, index) {
+    return ids[Math.round(index * (ids.length - 1) / (count - 1))];
+  });
+}
+
 function searchByVideoId() {
   const input = document.getElementById("videoIdSearchInput");
   if (!input) return;
@@ -1655,10 +1665,12 @@ function searchByVideoId() {
 
   cancelBackgroundResultRendering();
   resultsRenderGeneration++;
+  const generation = resultsRenderGeneration;
+  const frameLimit = numResultsPerVideo;
   latestQuery = JSON.stringify({ videoId: videoId });
   loadingSpinner = document.getElementById("loading-spinner");
   if (loadingSpinner) loadingSpinner.style.display = "block";
-  setVideoIdSearchStatus("Loading all keyframes...", "loading");
+  setVideoIdSearchStatus("Loading video keyframes...", "loading");
   setSearchLatency(null, "loading");
   const requestStartedAt = performance.now();
 
@@ -1669,12 +1681,14 @@ function searchByVideoId() {
     dataType: "json",
     url:
       urlVBSService.replace(/\/$/, "") +
-      "/getAllVideoKeyframes?videoId=" +
+      "/getAllVideoKeyframes/?videoId=" +
       encodeURIComponent(videoId),
     success: function (frameIds) {
+      if (generation !== resultsRenderGeneration) return;
       _searchXhr = null;
       const ids = Array.isArray(frameIds) ? frameIds : [];
-      const videoResults = ids.map(function (frameId) {
+      const sampledIds = sampleVideoKeyframes(ids, frameLimit);
+      const videoResults = sampledIds.map(function (frameId) {
         return {
           imgId: String(frameId),
           videoId: videoId,
@@ -1683,13 +1697,15 @@ function searchByVideoId() {
       });
       setSearchLatency(performance.now() - requestStartedAt, "ready");
       setVideoIdSearchStatus(
-        ids.length + (ids.length === 1 ? " keyframe" : " keyframes"),
+        sampledIds.length === ids.length
+          ? ids.length + (ids.length === 1 ? " keyframe" : " keyframes")
+          : sampledIds.length + " / " + ids.length + " keyframes (uniform)",
         ids.length ? "success" : "error",
       );
       setResults(videoResults, true);
     },
     error: function (xhr, status, error) {
-      if (status === "abort") return;
+      if (status === "abort" || generation !== resultsRenderGeneration) return;
       _searchXhr = null;
       setSearchLatency(null, "error");
       setVideoIdSearchStatus("Could not load this video.", "error");
@@ -2431,6 +2447,7 @@ function setTaskType(taskType) {
   else sessionStorage.setItem("taskType", taskType);
 
   localStorage.setItem("taskType", sessionStorage.getItem("taskType"));
+  if (document.body) document.body.dataset.task = getTaskType();
   $('input[name="option"][value="' + getTaskType() + '"]').prop(
     "checked",
     true,
@@ -2440,9 +2457,11 @@ function setTaskType(taskType) {
     true,
   );
   $("#taskTypeLabel").text(getTaskType().toUpperCase());
+  window.dispatchEvent(new Event("submission-task-changed"));
 }
 
 function submitResult(id, videoId, textAnswer = null, isAsync = false) {
+  if (getTaskType() === "trake") return;
   return $.ajax({
     type: "GET",
     async: isAsync,
@@ -2457,14 +2476,6 @@ function submitResult(id, videoId, textAnswer = null, isAsync = false) {
       "&taskType=" +
       getTaskType(),
   }).responseText;
-}
-
-function getDresSettings() {
-  return {};
-}
-
-function getDresSubmitUrl() {
-  throw new Error("Direct DRES submission is disabled; use the shared host queue.");
 }
 
 function openSubmitSettings() {
@@ -2484,10 +2495,6 @@ function openUserInfo() {
 
 function closeUserInfo() {
   $("#userInfoModal").prop("hidden", true);
-}
-
-function saveSubmitSettings() {
-  closeSubmitSettings();
 }
 
 function getFrameIndexFromId(frameId) {
@@ -2511,21 +2518,6 @@ function getFrameTimestampMs(frameId, videoId) {
 
 function submitKISFrame(frameId, videoId) {
   return window.queueHostSubmissionFrame(frameId, videoId);
-}
-
-function submitKISValues(videoId, startMs, endMs) {
-  return Promise.reject(new Error("Use a frame to save to the shared host queue first."));
-}
-
-function formatDresServerResponse(response, body) {
-  const statusText = response.statusText ? " " + response.statusText : "";
-  return (
-    "HTTP " +
-    response.status +
-    statusText +
-    "\n\n" +
-    (body || "(DRES returned an empty response)")
-  );
 }
 
 function submitQAFrame(frameId, videoId) {
@@ -2607,6 +2599,7 @@ function showKISServerResponse(title, message, isError) {
 }
 
 function submitAtTime(videoId, time) {
+  if (getTaskType() === "trake") return;
   return $.ajax({
     type: "GET",
     async: false,
@@ -2623,11 +2616,8 @@ function submitAtTime(videoId, time) {
 
 function submitVersion2(selectedItem) {
   const taskType = localStorage.getItem("taskType");
+  if (taskType === "trake") return;
   if (taskType === "kis" || taskType === "qa") {
-    if (typeof window.queueHostSubmissionFrame !== "function") {
-      showKISServerResponse("Host submission unavailable", "Reload the page to enable the shared host queue.", true);
-      return null;
-    }
     return window.queueHostSubmissionFrame(selectedItem.imgId, selectedItem.videoId)
       .then(function (message) { showKISServerResponse("Saved on host", message, false); })
       .catch(function (error) {
@@ -2637,7 +2627,7 @@ function submitVersion2(selectedItem) {
   $("#submitted_bar").css("display", "block");
   let res = null;
   if (submitAlert()) {
-      if (taskType === "avs")
+      if (localStorage.getItem("taskType") === "avs")
         submitResult(
           selectedItem.imgId,
           selectedItem.videoId,
@@ -2662,7 +2652,7 @@ function submitVersion2(selectedItem) {
 
       //che fa? boh!
       updateAVSInfo();
-      if (taskType === "avs") avsHideSubmittedVideos();
+      if (localStorage.getItem("taskType") === "avs") avsHideSubmittedVideos();
       else avsHilightlighSubmittedVideos();
   }
   return res;
@@ -2918,7 +2908,12 @@ function includeHTML(timeoutMs = 8000) {
   });
 }
 function sceneHasContent(idx) {
-  if (getSceneImage(idx) || document.getElementById(`sceneImageUrl${idx}`)?.value || document.getElementById(`panel_image${idx}`)?._imagePending) return true;
+  if (
+    getSceneImage(idx) ||
+    document.getElementById(`sceneImageUrl${idx}`)?.value ||
+    document.getElementById(`panel_image${idx}`)?._imagePending
+  )
+    return true;
   const fields = ["textual", "not", "ocr", "asr", "tags"];
   for (let i = 0; i < fields.length; i++) {
     if (($("#" + fields[i] + idx).val() || "").trim()) return true;
@@ -2937,7 +2932,9 @@ function sceneClean(idx) {
   const imagePanel = document.getElementById(`panel_image${idx}`);
   if (imagePanel) {
     imagePanel._previousImage = getSceneImage(idx);
-    imagePanel._previousUrl = document.getElementById(`sceneImageUrl${idx}`).value;
+    imagePanel._previousUrl = document.getElementById(
+      `sceneImageUrl${idx}`,
+    ).value;
     clearSceneImage(idx);
   }
   prevTextual[idx] = $("#textual" + idx).val() || "";
@@ -2946,21 +2943,7 @@ function sceneClean(idx) {
   if (cancelText) cancelText.style.display = "none";
 
   prevTextualMode[idx] = textualMode[idx];
-  const defaultMode =
-    config &&
-    config.ui &&
-    config.ui["textual-modes"] &&
-    config.ui["textual-modes"][0]
-      ? config.ui["textual-modes"][0].mode
-      : "all";
-  const hasAll =
-    config &&
-    config.ui &&
-    config.ui["textual-modes"] &&
-    config.ui["textual-modes"].some(function (m) {
-      return m.mode === "all";
-    });
-  const resetMode = hasAll ? "all" : defaultMode;
+  const resetMode = defaultTextualMode();
   textualMode[idx] = resetMode;
   const modeRadio = document.getElementById(
     "textualMode" + idx + "_" + resetMode,
@@ -3032,8 +3015,10 @@ function sceneCleanUndo(idx) {
   if (imagePanel) {
     clearSceneImage(idx);
     renderSceneImage(idx, imagePanel._previousImage || "");
-    document.getElementById(`sceneImageUrl${idx}`).value = imagePanel._previousUrl || "";
-    if (imagePanel._previousImage || imagePanel._previousUrl) setSceneChannel(idx, "image", true);
+    document.getElementById(`sceneImageUrl${idx}`).value =
+      imagePanel._previousUrl || "";
+    if (imagePanel._previousImage || imagePanel._previousUrl)
+      setSceneChannel(idx, "image", true);
   }
   const textualVal = prevTextual[idx] || "";
   $("#textual" + idx).val(textualVal);
@@ -3112,91 +3097,6 @@ function isSidebarCollapsed() {
   return localStorage.getItem("sidebarCollapsed") === "1";
 }
 
-const SIDEBAR_DEFAULT_WIDTH = 280;
-const SIDEBAR_MIN_WIDTH = 240;
-const SIDEBAR_MAX_WIDTH = 640;
-
-function maxSidebarWidth() {
-  return Math.max(
-    SIDEBAR_MIN_WIDTH,
-    Math.min(SIDEBAR_MAX_WIDTH, window.innerWidth - 360),
-  );
-}
-
-function clampSidebarWidth(value) {
-  const numeric = value === null || value === "" ? SIDEBAR_DEFAULT_WIDTH : Number(value);
-  const width = Number.isFinite(numeric) ? numeric : SIDEBAR_DEFAULT_WIDTH;
-  return Math.round(Math.min(maxSidebarWidth(), Math.max(SIDEBAR_MIN_WIDTH, width)));
-}
-
-function savedSidebarWidth() {
-  return clampSidebarWidth(localStorage.getItem("searchSidebarWidth"));
-}
-
-function setSidebarWidth(value, persist) {
-  const width = clampSidebarWidth(value);
-  $(".sidebarGrid").css({ width: width + "px", maxWidth: width + "px" });
-  $(".bodyGrid").css(
-    "grid-template-columns",
-    width + "px minmax(0, 1fr) auto",
-  );
-  $("#sidebarResizeHandle").attr("aria-valuenow", String(width));
-  if (persist) localStorage.setItem("searchSidebarWidth", String(width));
-  return width;
-}
-
-function initSidebarResizer() {
-  const handle = document.getElementById("sidebarResizeHandle");
-  const body = document.querySelector(".bodyGrid");
-  if (!handle || !body || handle.dataset.bound === "1") return;
-  handle.dataset.bound = "1";
-  let dragging = false;
-  let currentWidth = savedSidebarWidth();
-
-  function resizeFromPointer(event) {
-    const bodyLeft = body.getBoundingClientRect().left;
-    currentWidth = setSidebarWidth(event.clientX - bodyLeft, false);
-  }
-
-  function finishResize(event) {
-    if (!dragging) return;
-    dragging = false;
-    body.classList.remove("sidebar-resizing");
-    setSidebarWidth(currentWidth, true);
-    if (handle.hasPointerCapture?.(event.pointerId)) handle.releasePointerCapture(event.pointerId);
-  }
-
-  handle.addEventListener("pointerdown", function (event) {
-    if (event.button !== 0 || isSidebarCollapsed()) return;
-    event.preventDefault();
-    dragging = true;
-    body.classList.add("sidebar-resizing");
-    handle.setPointerCapture(event.pointerId);
-    resizeFromPointer(event);
-  });
-  handle.addEventListener("pointermove", function (event) {
-    if (dragging) resizeFromPointer(event);
-  });
-  handle.addEventListener("pointerup", finishResize);
-  handle.addEventListener("pointercancel", finishResize);
-  handle.addEventListener("dblclick", function () {
-    currentWidth = setSidebarWidth(SIDEBAR_DEFAULT_WIDTH, true);
-  });
-  handle.addEventListener("keydown", function (event) {
-    let next = savedSidebarWidth();
-    if (event.key === "ArrowLeft") next -= 20;
-    else if (event.key === "ArrowRight") next += 20;
-    else if (event.key === "Home") next = SIDEBAR_MIN_WIDTH;
-    else if (event.key === "End") next = maxSidebarWidth();
-    else return;
-    event.preventDefault();
-    currentWidth = setSidebarWidth(next, true);
-  });
-  window.addEventListener("resize", function () {
-    if (!isSidebarCollapsed()) currentWidth = setSidebarWidth(savedSidebarWidth(), false);
-  });
-}
-
 function applySidebarLayout() {
   const collapsed = isSidebarCollapsed();
   const $body = $(".bodyGrid");
@@ -3210,8 +3110,8 @@ function applySidebarLayout() {
     $btn.attr("aria-expanded", "false").attr("title", "Hiện thanh công cụ");
   } else {
     $body.removeClass("sidebar-collapsed");
-    $sidebar.css("display", "flex");
-    setSidebarWidth(savedSidebarWidth(), false);
+    $sidebar.css({ width: "280px", maxWidth: "280px", display: "flex" });
+    $body.css("grid-template-columns", "280px minmax(0, 1fr) auto");
     $btn.attr("aria-expanded", "true").attr("title", "Ẩn thanh công cụ");
   }
 }
@@ -3227,7 +3127,6 @@ function initLayout() {
   // the fixed utility bar at the top of the page.
   localStorage.setItem("sidebarCollapsed", "0");
   document.body.classList.add("advanced-mode");
-  initSidebarResizer();
   applySidebarLayout();
   $("#visionelogo").addClass("visioneLogo sidebar-brand");
 }
