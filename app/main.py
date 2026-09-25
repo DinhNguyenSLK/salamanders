@@ -7,7 +7,7 @@ from typing import Annotated
 
 from contextlib import asynccontextmanager
 from search_engine import ElasticSearchClientSingleton
-from routes import search, media, get_field, rewrite, generate_image, host_submissions, trake_submissions
+from routes import search, media, get_field, rewrite, generate_image, host_submissions, trake_submissions, asr
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -48,6 +48,7 @@ def pong():
 app.include_router(search.router)
 app.include_router(media.router)
 app.include_router(get_field.router)
+app.include_router(asr.router)
 app.include_router(rewrite.router)
 app.include_router(generate_image.router)
 app.include_router(host_submissions.router)

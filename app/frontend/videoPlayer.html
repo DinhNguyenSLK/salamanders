@@ -222,6 +222,16 @@
     #trakeSubmit { background: #198754; border-color: #198754; color: #fff; margin-left: 8px; }
     #trakeError { color: #ff9e9e; min-height: 18px; font: 13px Arial, sans-serif; }
     #trakeJson { width: 100%; min-height: 170px; resize: vertical; font: 13px Consolas, monospace; }
+    #playerLayout { display: flex; align-items: flex-start; gap: 16px; }
+    #asrPanel { display: none; flex-direction: column; width: 320px; height: 480px; padding: 12px; background: #111; border: 1px solid #444; border-radius: 5px; font: 13px/1.5 Arial, sans-serif; }
+    #asrPanel h2 { margin: 0 0 8px; font-size: 16px; }
+    #asrStatus { margin: 0; color: #aaa; }
+    #asrLines { flex: 1; min-height: 0; overflow-y: auto; }
+    .asr-line { display: flex; gap: 10px; padding: 4px 6px; border-radius: 3px; }
+    .asr-time { flex: none; color: #aaa; }
+    .asr-line.asr-near { font-weight: 700; background: #283c2e; }
+    .asr-line.asr-near .asr-time { color: #a7efb7; }
+    @media (min-width: 1000px) { #asrPanel { display: flex; } }
     @media (max-width: 520px) { .trake-slot { flex-wrap: wrap; } .trake-slot input { flex-basis: calc(100% - 80px); } }
   </style>
 </head>
@@ -265,25 +275,32 @@
     }
   </script>
 
-  <div id="videoWrap">
-    <video
-      id="vbsvideo"
-      class="video-js vjs-big-play-centered"
-      controls
-      preload="auto"
-      width="640"
-      height="480"
-      playsinline
-    ></video>
-    <div id="timelinePreview" hidden aria-hidden="true">
-      <img id="timelinePreviewImage" alt="" />
-      <span id="timelinePreviewTime"></span>
+  <div id="playerLayout">
+    <div id="videoWrap">
+      <video
+        id="vbsvideo"
+        class="video-js vjs-big-play-centered"
+        controls
+        preload="auto"
+        width="640"
+        height="480"
+        playsinline
+      ></video>
+      <div id="timelinePreview" hidden aria-hidden="true">
+        <img id="timelinePreviewImage" alt="" />
+        <span id="timelinePreviewTime"></span>
+      </div>
+      <div id="youtubeFallback"></div>
+      <button type="button" id="youtubePlayButton" aria-label="Play YouTube video" hidden disabled>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>
+        <span>Play video</span>
+      </button>
     </div>
-    <div id="youtubeFallback"></div>
-    <button type="button" id="youtubePlayButton" aria-label="Play YouTube video" hidden disabled>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>
-      <span>Play video</span>
-    </button>
+    <section id="asrPanel" aria-label="Video transcript">
+      <h2>ASR transcript</h2>
+      <p id="asrStatus" role="status">Loading transcript...</p>
+      <div id="asrLines"></div>
+    </section>
   </div>
 
   <div id="frameHud">
@@ -338,6 +355,8 @@
   var youtubeApiPromise = null;
   var playbackInfoPromise = null;
   var timelineKeyframes = [];
+  var asrLines = [];
+  var lastAsrTick = null;
 
   function padFrame(n) {
     var s = String(Math.max(0, n | 0));
@@ -425,6 +444,48 @@
     progress.addEventListener("mouseleave", function () { preview.hidden = true; });
   }
 
+  function loadAsr(videoId) {
+    fetch(urlVBSService.replace(/\/$/, "") + "/getVideoAsr?videoId=" + encodeURIComponent(videoId))
+      .then(function (response) { if (!response.ok) throw new Error("ASR unavailable"); return response.json(); })
+      .then(function (rows) {
+        var container = document.getElementById("asrLines");
+        var fragment = document.createDocumentFragment();
+        asrLines = [];
+        (Array.isArray(rows) ? rows : []).forEach(function (row) {
+          var start = Number(row.start_seconds);
+          var end = Number(row.end_seconds);
+          if (!isFinite(start) || !isFinite(end) || end < start) return;
+          var line = document.createElement("div");
+          line.className = "asr-line";
+          var time = document.createElement("span");
+          time.className = "asr-time";
+          time.textContent = formatClock(start) + "–" + formatClock(end);
+          var content = document.createElement("span");
+          content.textContent = String(row.content || "");
+          line.appendChild(time);
+          line.appendChild(content);
+          fragment.appendChild(line);
+          asrLines.push({ start: start, end: end, element: line });
+        });
+        container.replaceChildren(fragment);
+        document.getElementById("asrStatus").textContent = asrLines.length ? "" : "No transcript available.";
+        lastAsrTick = null;
+        updateHud();
+      }).catch(function () {
+        document.getElementById("asrStatus").textContent = "Transcript unavailable.";
+      });
+  }
+
+  function updateAsrHighlight(time) {
+    if (!isFinite(time)) return;
+    var tick = Math.floor(time * 4);
+    if (tick === lastAsrTick) return;
+    lastAsrTick = tick;
+    asrLines.forEach(function (line) {
+      line.element.classList.toggle("asr-near", line.start <= time + 5 && line.end >= time - 5);
+    });
+  }
+
   function updateHud() {
     if (!myPlayer && !youtubePlayer) return;
     var t = youtubeFallbackActive
@@ -442,6 +503,7 @@
         ? d.toFixed(3) + "s (" + formatClock(d) + ")"
         : "—";
     document.getElementById("fpsValue").textContent = String(videoFps);
+    updateAsrHighlight(t);
   }
 
   function startHudLoop() {
@@ -629,6 +691,7 @@
 
     // Start metadata loading while the browser checks the local MP4.
     loadPlaybackInfo(videoId).catch(function () {});
+    loadAsr(videoId);
 
     // Không dùng data-setup — tránh init Video.js 2 lần (gây lỗi nút play/pause)
     myPlayer = videojs("vbsvideo", {
