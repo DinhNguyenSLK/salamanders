@@ -2,6 +2,7 @@
 from pathlib import Path
 import subprocess
 import argparse
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from tqdm import tqdm
 
 class VideoResizer:
@@ -15,7 +16,7 @@ class VideoResizer:
         self.input_path = input_path
         self.output_path = output_path
         # self.tiny_video_size = (146, -2)     # (width, height)
-        self.medium_video_size = (-2, 480)   # (width, height)
+        self.medium_video_size = (-2, 380)   # (width, height)
         self.force = force
     
     def resize_one(self, video_path: Path, output_medium: Path):
@@ -65,14 +66,25 @@ class VideoResizer:
         try:
             video_files = sorted(list(self.input_path.glob("*/*.mp4")))
             # print(video_files)
-            bar = tqdm(video_files, desc="Resizing videos", colour="green")
             print(f"Tổng số video cần resize: {len(video_files)}")
-            for video_path in bar:
-                # output_tiny = output_tiny_dir / video_path.with_suffix('.mp4').name
-                output_medium = output_medium_dir / video_path.with_suffix('.mp4').name
-                self.resize_one(video_path,  output_medium)
+            with ProcessPoolExecutor(max_workers=2) as executor:
+                futures = {}
+                for video_path in video_files:
+                    # output_tiny = output_tiny_dir / video_path.with_suffix('.mp4').name
+                    output_medium = output_medium_dir / video_path.with_suffix('.mp4').name
+                    future = executor.submit(self.resize_one, video_path, output_medium)
+                    futures[future] = video_path
 
-                print(f"Đã resize xong: {video_path.stem}")
+                bar = tqdm(
+                    as_completed(futures),
+                    total=len(futures),
+                    desc="Resizing videos",
+                    colour="green",
+                )
+                for future in bar:
+                    video_path = futures[future]
+                    future.result()
+                    print(f"Đã resize xong: {video_path.stem}")
 
         except Exception as e:
             print(f"Error resizing video: {e}")
