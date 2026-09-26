@@ -30,7 +30,7 @@ function fixture() {
     for (const prefix of ['panel_image', 'channel_image', 'sceneImageUrl', 'sceneImageFile', 'sceneImageStatus', 'sceneImagePreview', 'sceneImageThumb', 'textual', 'textualLanguage', 'ocr', 'asr', 'not', 'tags']) node(prefix + idx);
   }
   const context = vm.createContext({
-    URL, console, config: {}, canvasWidth: 300, canvasHeight: 200,
+    URL, console, window: {}, config: {}, canvasWidth: 300, canvasHeight: 200,
     document: { getElementById: id => nodes.get(id), addEventListener() {} },
     isCanvasClean: [], textualMode: ['siglip2', 'align'], occur: [], isCanvasEnabled: [], canvases: [],
     tempSearchForms: 2,

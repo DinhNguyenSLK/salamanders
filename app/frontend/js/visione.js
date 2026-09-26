@@ -466,6 +466,7 @@ function mountSearchScene(idx) {
     $("#searchTab").append(html);
   }
   orderScenePanels(idx);
+  if (window.SceneSpeech) window.SceneSpeech.initScene(idx);
   const canvas = get_canvas(idx);
   canvases[idx] = canvas;
   syncCanvasAliases();
@@ -492,6 +493,7 @@ function addSearchScene() {
 function removeLastSearchScene() {
   if (tempSearchForms <= 1) return;
   const idx = tempSearchForms - 1;
+  if (window.SceneSpeech) window.SceneSpeech.cancel(idx);
   try {
     if (canvases[idx]) canvases[idx].dispose();
   } catch (e) {}
@@ -525,6 +527,7 @@ function removeLastSearchScene() {
 }
 
 function initSearchScenes() {
+  if (window.SceneSpeech) window.SceneSpeech.cancel();
   $("#utilityModelOptions").empty();
   tempSearchForms = 0;
   canvases = [];
@@ -562,6 +565,7 @@ function bindSearchSceneDelegates() {
         canvas.renderAll();
       }
     } else {
+      if (field === "textual" && window.SceneSpeech) window.SceneSpeech.cancel(idx);
       $("#" + field + idx).val("");
       if (field === "textual") {
         $("#cancelText" + idx).hide();
@@ -612,6 +616,7 @@ function bindSearchSceneDelegates() {
   $tab.on("click.sceneDyn", '[id^="cancelText"]', function () {
     const idx = parseInt(this.id.replace("cancelText", ""), 10);
     if (isNaN(idx)) return;
+    if (window.SceneSpeech) window.SceneSpeech.cancel(idx);
     $("#textual" + idx).val("");
     this.style.display = "none";
     markSceneDirty(idx);
@@ -914,6 +919,7 @@ function rewriteSceneQuery(idx) {
 function applyRewriteToTextual(idx) {
   const text = ($("#rewrite" + idx).val() || "").trim();
   if (!text) return;
+  if (window.SceneSpeech) window.SceneSpeech.cancel(idx);
   $("#textual" + idx).val(text);
   const cancel = document.getElementById("cancelText" + idx);
   if (cancel) cancel.style.display = "block";
@@ -2963,6 +2969,7 @@ function sceneHasContent(idx) {
 }
 
 function sceneClean(idx) {
+  if (window.SceneSpeech) window.SceneSpeech.cancel(idx);
   document.getElementById("historyReference" + idx)?.remove();
   const imagePanel = document.getElementById(`panel_image${idx}`);
   if (imagePanel) {
@@ -3051,6 +3058,7 @@ function undoReset() {
 }
 
 function sceneCleanUndo(idx) {
+  if (window.SceneSpeech) window.SceneSpeech.cancel(idx);
   const imagePanel = document.getElementById(`panel_image${idx}`);
   if (imagePanel) {
     clearSceneImage(idx);
