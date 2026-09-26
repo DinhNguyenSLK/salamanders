@@ -12,7 +12,7 @@
   <script src="js/js-yaml.min.js"></script>
   <script src="js/visione.js?v=host1"></script>
   <script src="js/customSubmission.js?v=host1"></script>
-  <script src="js/trakeSubmission.js?v=1"></script>
+  <script src="js/trakeSubmission.js?v=2"></script>
   <link rel="stylesheet" href="css/customSubmission.css?v=1">
   <style>
     * { box-sizing: border-box; }
@@ -223,6 +223,11 @@
     #trakeError { color: #ff9e9e; min-height: 18px; font: 13px Arial, sans-serif; }
     #trakeJson { width: 100%; min-height: 170px; resize: vertical; font: 13px Consolas, monospace; }
     #playerLayout { display: flex; align-items: flex-start; gap: 16px; }
+    #seekControls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; max-width: 640px; font: 13px Arial, sans-serif; }
+    #seekControls button { padding: 7px 12px; border: 1px solid #666; border-radius: 4px; background: #222; color: #fff; cursor: pointer; }
+    #seekControls button:hover, #seekControls button:focus-visible { background: #385540; }
+    #seekControls span { color: #aaa; }
+    #playbackSpeed { padding: 7px; border: 1px solid #666; border-radius: 4px; background: #222; color: #fff; }
     #asrPanel { display: none; flex-direction: column; width: 320px; height: 480px; padding: 12px; background: #111; border: 1px solid #444; border-radius: 5px; font: 13px/1.5 Arial, sans-serif; }
     #asrPanel h2 { margin: 0 0 8px; font-size: 16px; }
     #asrStatus { margin: 0; color: #aaa; }
@@ -301,6 +306,23 @@
       <p id="asrStatus" role="status">Loading transcript...</p>
       <div id="asrLines"></div>
     </section>
+  </div>
+
+  <div id="seekControls" role="group" aria-label="Quick seek">
+    <label for="playbackSpeed">Tốc độ phát</label>
+    <select id="playbackSpeed" aria-describedby="playbackSpeedStatus">
+      <option value="0.5">0.5×</option>
+      <option value="1" selected>1×</option>
+      <option value="1.5">1.5×</option>
+      <option value="2">2×</option>
+      <option value="3">3×</option>
+    </select>
+    <span id="playbackSpeedStatus" role="status"></span>
+    <button type="button" data-seek-seconds="-30" aria-label="Rewind 30 seconds">&#171; 30s</button>
+    <button type="button" data-seek-seconds="-10" aria-label="Rewind 10 seconds">&#8249; 10s</button>
+    <button type="button" data-seek-seconds="10" aria-label="Forward 10 seconds">10s &#8250;</button>
+    <button type="button" data-seek-seconds="30" aria-label="Forward 30 seconds">30s &#187;</button>
+    <span>&#8592; / &#8594;: 10s &middot; Shift + &#8592; / &#8594;: 30s</span>
   </div>
 
   <div id="frameHud">
@@ -481,9 +503,26 @@
     var tick = Math.floor(time * 4);
     if (tick === lastAsrTick) return;
     lastAsrTick = tick;
+    var nearestLine = null;
+    var nearestDistance = Infinity;
     asrLines.forEach(function (line) {
       line.element.classList.toggle("asr-near", line.start <= time + 5 && line.end >= time - 5);
+      var distance = Math.max(line.start - time, time - line.end, 0);
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestLine = line;
+      }
     });
+    if (!nearestLine) return;
+    var container = nearestLine.element.parentElement;
+    if (!container || !container.clientHeight) return;
+    var containerRect = container.getBoundingClientRect();
+    var lineRect = nearestLine.element.getBoundingClientRect();
+    if (lineRect.top < containerRect.top || lineRect.bottom > containerRect.bottom) {
+      // Scroll only the transcript panel, leaving the video and page in place.
+      container.scrollTop += lineRect.top - containerRect.top
+        - Math.max(0, (container.clientHeight - lineRect.height) / 2);
+    }
   }
 
   function updateHud() {
@@ -515,13 +554,71 @@
     hudRaf = requestAnimationFrame(tick);
   }
 
+  function setPlaybackSpeed(rate) {
+    if (!isFinite(rate) || rate <= 0) return;
+    if (youtubeFallbackActive) {
+      if (!youtubePlayer || !youtubePlayer.setPlaybackRate) return;
+      if (youtubePlayer.getAvailablePlaybackRates().indexOf(rate) === -1) return;
+      youtubePlayer.setPlaybackRate(rate);
+    } else if (myPlayer) {
+      myPlayer.playbackRate(rate);
+    }
+  }
+
+  function configurePlaybackSpeed() {
+    var select = document.getElementById("playbackSpeed");
+    var rates = youtubeFallbackActive ? youtubePlayer.getAvailablePlaybackRates() : [0.5, 1, 1.5, 2, 3];
+    rates.forEach(function (rate) {
+      if (!Array.prototype.some.call(select.options, function (option) { return Number(option.value) === rate; })) {
+        var option = document.createElement("option");
+        option.value = String(rate);
+        option.textContent = rate + "×";
+        select.appendChild(option);
+      }
+    });
+    Array.prototype.forEach.call(select.options, function (option) {
+      option.disabled = rates.indexOf(Number(option.value)) === -1;
+    });
+    document.getElementById("playbackSpeedStatus").textContent = youtubeFallbackActive
+      ? "YouTube: chỉ chọn được tốc độ video hỗ trợ." : "";
+    if (rates.indexOf(Number(select.value)) === -1) select.value = "1";
+    select.disabled = false;
+    setPlaybackSpeed(Number(select.value));
+  }
+
+  function seekBySeconds(deltaSeconds) {
+    var player = youtubeFallbackActive ? youtubePlayer : myPlayer;
+    if (!player || !isFinite(deltaSeconds)) return;
+    if (youtubeFallbackActive && (!player.getCurrentTime || !player.seekTo)) return;
+    var time = youtubeFallbackActive ? player.getCurrentTime() : player.currentTime();
+    var duration = youtubeFallbackActive ? player.getDuration() : player.duration();
+    if (!isFinite(time)) return;
+    var target = Math.max(0, time + deltaSeconds);
+    if (isFinite(duration) && duration > 0) target = Math.min(target, duration);
+    currentSeekTime = target;
+    if (youtubeFallbackActive) player.seekTo(target, true);
+    else player.currentTime(target);
+    updateHud();
+  }
+
+  function onQuickSeekKey(event) {
+    if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    var target = event.target;
+    if (target && (target.isContentEditable || target.closest('input, textarea, select, [role="slider"], [role="dialog"]'))) return;
+    event.preventDefault();
+    event.stopPropagation();
+    seekBySeconds((event.key === "ArrowLeft" ? -1 : 1) * (event.shiftKey ? 30 : 10));
+  }
+
   function seekByFrames(deltaFrames) {
     if (!myPlayer && !youtubePlayer) return;
     if (youtubeFallbackActive && !youtubePlayer) return;
     if (!youtubeFallbackActive) myPlayer.pause();
     var t = youtubeFallbackActive
-      ? (youtubePlayer.getCurrentTime() || currentSeekTime)
+      ? youtubePlayer.getCurrentTime()
       : (myPlayer.currentTime() || 0);
+    if (!isFinite(t)) t = currentSeekTime;
     var frame = ffmpegFrameIndex(t, videoFps) + deltaFrames;
     if (frame < 0) frame = 0;
     var duration = youtubeFallbackActive ? youtubePlayer.getDuration() : myPlayer.duration();
@@ -621,6 +718,7 @@
       var youtubeId = getYoutubeVideoId(info.watch_url);
       if (!youtubeId) throw new Error("No valid YouTube watch_url in media-info for " + videoId);
       youtubeFallbackActive = true;
+      document.getElementById("playbackSpeed").disabled = true;
       currentSeekTime = seekTime;
       myPlayer.pause();
       myPlayer.el().style.display = "none";
@@ -643,11 +741,15 @@
           },
           events: {
             onReady: function (event) {
+              configurePlaybackSpeed();
               event.target.unMute();
               event.target.seekTo(seekTime, true);
               event.target.pauseVideo();
               updateYoutubePlayButton(YT.PlayerState.PAUSED);
               updateHud();
+            },
+            onPlaybackRateChange: function (event) {
+              document.getElementById("playbackSpeed").value = String(event.data);
             },
             onStateChange: function (event) {
               updateYoutubePlayButton(event.data);
@@ -737,6 +839,7 @@
 
     // Fallback nếu metadata đã sẵn / event đã qua
     myPlayer.ready(function () {
+      if (!youtubeFallbackActive) configurePlaybackSpeed();
       initTimelinePreview(videoId);
       if (myPlayer.readyState() >= 1) {
         startAtSeek();
@@ -758,7 +861,18 @@
     myPlayer.on("durationchange", updateHud);
     myPlayer.on("play", updateHud);
     myPlayer.on("pause", updateHud);
+    myPlayer.on("ratechange", function () {
+      if (!youtubeFallbackActive) document.getElementById("playbackSpeed").value = String(myPlayer.playbackRate());
+    });
+    document.getElementById("playbackSpeed").addEventListener("change", function (event) {
+      setPlaybackSpeed(Number(event.target.value));
+    });
     document.getElementById("youtubePlayButton").addEventListener("click", playYoutubeFallback);
+    document.getElementById("seekControls").addEventListener("click", function (event) {
+      var button = event.target.closest("button[data-seek-seconds]");
+      if (button) seekBySeconds(Number(button.dataset.seekSeconds));
+    });
+    document.addEventListener("keydown", onQuickSeekKey, true);
   }
 
   loadConfig().then(loadPage);

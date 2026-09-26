@@ -259,8 +259,10 @@ const searchForm = (
 					<textarea id="textual${canvasID}" type="text" class="textualquery${canvasID} font-normal" rows="2"
 						placeholder="${placeholder}"></textarea>
 					<span id="cancelText${canvasID}" class="field-clear-btn input-clear-btn" data-clear-field="textual" data-scene-idx="${canvasID}" title="Clear textual query" aria-label="Clear textual query">&times;</span>
+					<button type="button" id="speechButton${canvasID}" class="scene-speech-button" aria-label="Speak to enter a scene description" aria-pressed="false" aria-controls="textual${canvasID}" aria-describedby="speechStatus${canvasID}" title="Speak to enter a scene description" onclick="SceneSpeech.toggle(${canvasID})"><i class="fa fa-microphone" aria-hidden="true"></i></button>
 				</div>
 			</div>
+			<div id="speechStatus${canvasID}" class="scene-speech-status" role="status" aria-live="polite"></div>
 		</div>
 
 		<div class="field-panel transcript-panel rewrite-panel collapsed" id="panel_rewrite${canvasID}">

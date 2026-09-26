@@ -30,7 +30,7 @@
       input.type = "text";
       input.inputMode = "numeric";
       input.pattern = "[0-9]+";
-      input.placeholder = "Frame ID";
+      input.placeholder = "Frame ID (blank = 1)";
       input.value = value;
       input.addEventListener("input", function () { slots[index] = input.value.trim(); });
       const fill = document.createElement("button");
@@ -73,11 +73,11 @@
     if (!isTrake()) return;
     showError("");
     if (!videoId()) { showError("Missing video ID."); return; }
-    if (slots.some(function (value) { return !/^[0-9]+$/.test(value); })) {
-      showError("Fill every event with a numeric frame ID before submitting.");
+    if (slots.some(function (value) { return value !== "" && !/^[0-9]+$/.test(value); })) {
+      showError("Enter a numeric frame ID or leave the event blank to use 1.");
       return;
     }
-    slots.forEach(function (value, index) { slots[index] = unpadFrame(value); });
+    slots.forEach(function (value, index) { slots[index] = unpadFrame(value || "1"); });
     renderSlots();
     const payload = { answerSets: [{ answers: [{ text: "TR-" + videoId() + "-" + slots.join(",") }] }] };
     document.getElementById("trakeJson").value = JSON.stringify(payload, null, 2);
