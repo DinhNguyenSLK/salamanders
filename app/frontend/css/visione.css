@@ -625,6 +625,32 @@ body {
   position: relative;
 }
 
+.textual-language-picker {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 6px;
+  color: var(--earth-text, #66513d);
+  font-size: 11px;
+}
+
+.textual-language-picker select {
+  min-width: 0;
+  max-width: 100%;
+  padding: 3px 6px;
+  border: 1px solid var(--earth-border, #d9c7b0);
+  border-radius: 5px;
+  background: var(--earth-surface, #fffaf0);
+  color: inherit;
+  font: inherit;
+}
+
+.textual-language-picker select:focus-visible {
+  outline: 2px solid var(--earth-gold, #c99438);
+  outline-offset: 1px;
+}
+
 .input-with-clear {
   position: relative;
 }

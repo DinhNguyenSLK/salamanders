@@ -5,7 +5,7 @@ class SearchResult(BaseModel):
     score: float = Field(0, ge=0, description="Score trả về cho một ảnh")
     imgId: str = Field(description="Ví dụ: L21_V001-00365")
     videoId: str = Field(description="Ví dụ: L21_V001")
-    selectedFrame: int = Field(ge=0, le=1000000)
+    selectedFrame: int = Field(ge=0)
     shotId: int = Field(default=0, ge=0, le=100000, description="Shot id mà frame thuộc về")
     
 class RewriteResult(BaseModel):

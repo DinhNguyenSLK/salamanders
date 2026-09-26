@@ -254,6 +254,13 @@ const searchForm = (
 		</div>
 
 		<div id="textual${canvasID}_container" class="textual-container" title="Scene Description">
+			<label class="textual-language-picker" for="textualLanguage${canvasID}">
+				<span>Query language</span>
+				<select id="textualLanguage${canvasID}">
+					<option value="vi" selected>Vietnamese → English</option>
+					<option value="en">English (direct)</option>
+				</select>
+			</label>
 			<div id="div_textual${canvasID}">
 				<div class="Icon-inside">
 					<textarea id="textual${canvasID}" type="text" class="textualquery${canvasID} font-normal" rows="2"

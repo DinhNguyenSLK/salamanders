@@ -1370,6 +1370,7 @@ function cell2Text(idx) {
   if (sceneImage) queryObj.qbe = sceneImage;
   let queryParameters = {
     textual_model: textualMode[idx] || "all",
+    textual_language: $("#textualLanguage" + idx).val() || "vi",
     operator: occur[idx] || "and",
     ocr_operator: $("#ocrOperator" + idx).attr("data-operator") || "or",
     asr_operator: $("#asrOperator" + idx).attr("data-operator") || "or",
@@ -2973,6 +2974,11 @@ function sceneClean(idx) {
   }
   prevTextual[idx] = $("#textual" + idx).val() || "";
   $("#textual" + idx).val("");
+  const languageSelect = document.getElementById("textualLanguage" + idx);
+  if (languageSelect) {
+    languageSelect.dataset.previousLanguage = languageSelect.value;
+    languageSelect.value = "vi";
+  }
   const cancelText = document.getElementById("cancelText" + idx);
   if (cancelText) cancelText.style.display = "none";
 
@@ -3056,6 +3062,8 @@ function sceneCleanUndo(idx) {
   }
   const textualVal = prevTextual[idx] || "";
   $("#textual" + idx).val(textualVal);
+  const languageSelect = document.getElementById("textualLanguage" + idx);
+  if (languageSelect) languageSelect.value = languageSelect.dataset.previousLanguage || "vi";
   const cancelText = document.getElementById("cancelText" + idx);
   if (cancelText)
     cancelText.style.display = textualVal === "" ? "none" : "block";

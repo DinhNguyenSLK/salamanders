@@ -27,7 +27,7 @@ function fixture() {
     return el;
   }
   for (let idx = 0; idx < 2; idx++) {
-    for (const prefix of ['panel_image', 'channel_image', 'sceneImageUrl', 'sceneImageFile', 'sceneImageStatus', 'sceneImagePreview', 'sceneImageThumb', 'textual', 'ocr', 'asr', 'not', 'tags']) node(prefix + idx);
+    for (const prefix of ['panel_image', 'channel_image', 'sceneImageUrl', 'sceneImageFile', 'sceneImageStatus', 'sceneImagePreview', 'sceneImageThumb', 'textual', 'textualLanguage', 'ocr', 'asr', 'not', 'tags']) node(prefix + idx);
   }
   const context = vm.createContext({
     URL, console, config: {}, canvasWidth: 300, canvasHeight: 200,
@@ -63,6 +63,7 @@ test('each scene generates unique channel controls and image inputs', () => {
   assert.equal(ids.length, new Set(ids).size);
   assert.equal((html.match(/class="channel-button"/g) || []).length, 14);
   assert.ok(ids.includes('textual0') && ids.includes('textual1'));
+  assert.ok(ids.includes('textualLanguage0') && ids.includes('textualLanguage1'));
 });
 
 test('channel visibility preserves the scene image and synchronizes accessible state', () => {
@@ -88,6 +89,21 @@ test('mixed text and images stay paired with their temporal scenes and models', 
     { qbe: 'data:image/png;base64,AAAA' },
   ]);
   assert.deepEqual(result.paramItems.map(p => p.textual_model), ['siglip2', 'align']);
+});
+
+test('English bypass is selected per scene and survives clear/undo', () => {
+  const { context: c, nodes } = fixture();
+  nodes.get('textual0').value = 'a red car';
+  nodes.get('textual1').value = 'một chiếc xe';
+  nodes.get('textualLanguage0').value = 'en';
+  let result = JSON.parse(JSON.stringify(c.collectTemporalSearchItems()));
+  assert.deepEqual(result.paramItems.map(p => p.textual_language), ['en', 'vi']);
+  c.sceneClean(0);
+  assert.equal(nodes.get('textualLanguage0').value, 'vi');
+  c.sceneCleanUndo(0);
+  result = JSON.parse(JSON.stringify(c.collectTemporalSearchItems()));
+  assert.equal(result.queryItems[0].textual, 'a red car');
+  assert.equal(result.paramItems[0].textual_language, 'en');
 });
 
 test('URL validation, clear and undo preserve independent scene examples', () => {

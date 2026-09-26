@@ -138,7 +138,10 @@ async def search(
         if queryObj.get("textual"):
             textual_query = queryObj.parseTextual()
 
-            cache_result =  MEMORY_CACHE.get(field= "textual", content= textual_query["textual"], mode= textual_query["mode"], top_k=k)
+            cache_result = MEMORY_CACHE.get(
+                field="textual", content=textual_query["textual"],
+                mode=textual_query["mode"], top_k=k, language=textual_query["language"],
+            )
             results = None
 
             if cache_result is not None:
@@ -152,6 +155,7 @@ async def search(
                 record.update({
                     "results": results,
                     "mode": textual_query["mode"],
+                    "language": textual_query["language"],
                     "top_k": k,
                 })
 

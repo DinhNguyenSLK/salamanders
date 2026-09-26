@@ -33,7 +33,8 @@ class QueryObj:
     def parseTextual(self):
         return {
             "textual": self.query.textual,
-            "mode": self.parameter.textual_model
+            "mode": self.parameter.textual_model,
+            "language": self.parameter.textual_language,
         }
 
     def parsePos(self):

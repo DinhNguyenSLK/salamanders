@@ -11,11 +11,12 @@ BASEURL = settings.VECTORSEARCH_URL
 class APIVectorSearch(ABC):
     def __init__(
             self,
-            translator = Translator(),
+            translator = None,
             baseurl: str = BASEURL,
             
     ):
-        self.translator = Translator()
+        # English searches do not need a translation client or credentials.
+        self.translator = translator
         self.baseurl = baseurl
 
     def search(
@@ -28,9 +29,16 @@ class APIVectorSearch(ABC):
         endpoint = self.baseurl + '/' + query_type
         start = time()
 
+        query = dict(query)
         query['k'] = k
-        if query_type=="textual" and "textual" in query.keys():
-            query['textual'] = self.translator.translate(query['textual'])
+        if query_type == "textual" and "textual" in query:
+            language = query.pop("language", "vi")
+            if language not in ("vi", "en"):
+                raise ValueError(f"Unsupported textual language: {language}")
+            if language == "vi":
+                if self.translator is None:
+                    self.translator = Translator()
+                query['textual'] = self.translator.translate(query['textual'])
 
         print(f'Thời gian translate {-start + time()}')
 

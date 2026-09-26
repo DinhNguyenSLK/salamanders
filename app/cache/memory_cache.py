@@ -10,6 +10,7 @@ class CacheResult(BaseModel):
     top_k: int = 1000
     fuzziness: str | int = "no"
     operator: str = "no"
+    language: str = "vi"
 
 
 class MemoryCache:
@@ -27,7 +28,7 @@ class MemoryCache:
         self._cache = {}
         self.maximum_size = maximum_size
 
-    def get(self, field: str, content: str, mode: str = "no", top_k: int = 1000, fuzziness: str |int = "no", operator: str = "no"):
+    def get(self, field: str, content: str, mode: str = "no", top_k: int = 1000, fuzziness: str |int = "no", operator: str = "no", language: str = "vi"):
 
         if field in self._cache:
             for cache_result in reversed(self._cache[field]):
@@ -36,6 +37,7 @@ class MemoryCache:
                         and cache_result.top_k == top_k
                         and cache_result.fuzziness == fuzziness
                         and cache_result.operator == operator
+                        and cache_result.language == language
                         ):
                     return cache_result.results
             return None

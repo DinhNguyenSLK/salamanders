@@ -20,6 +20,7 @@ class QueryItems(BaseModel):
 
 class ParamItems(BaseModel):
     textual_model: Literal["metaclip2", "siglip2", "align"] = "siglip2"
+    textual_language: Literal["vi", "en"] = "vi"
     operator: Literal["or", "and"] = "and"
     range: Literal["lt", "gt", "eq"] = "eq"
 

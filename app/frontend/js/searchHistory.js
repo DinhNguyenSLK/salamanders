@@ -108,6 +108,7 @@ function renderSearchHistory() {
     meta.className = "history-meta";
     const p = record.payload;
     meta.textContent = [...new Set(p.parameters.map(p => p.textual_model)), p.video_type || "all",
+      ...new Set(p.parameters.map(p => p.textual_language === "en" ? "English (direct)" : "Vietnamese → English")),
       "K " + p.k, p.query.length + (p.query.length === 1 ? " scene" : " scenes")].join(" · ");
     const time = document.createElement("span");
     time.className = "history-time";
@@ -132,6 +133,7 @@ function restoreSearchHistory(record) {
       if (el) el.value = value ?? "";
     };
     setValue("textual", query.textual);
+    setValue("textualLanguage", params.textual_language === "en" ? "en" : "vi");
     setValue("ocr", query.ocr);
     setValue("asr", query.asr);
     setValue("tags", (query.tags || []).join(", "));
