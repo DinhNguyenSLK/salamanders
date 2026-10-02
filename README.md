@@ -6,7 +6,7 @@
 
 ![Status](https://img.shields.io/badge/status-under%20development-orange?style=for-the-badge)
 ![Python](https://img.shields.io/badge/python-3.12.6-blue?style=for-the-badge&logo=python&logoColor=white)
-![AIC](https://img.shields.io/badge/AIC%202026-finalist-success?style=for-the-badge)
+
 
 </div>
 
