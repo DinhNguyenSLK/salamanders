@@ -16,7 +16,7 @@
 
 | Preliminary Round – HCM AI Challenge 2026 | Final Round – AIC 2026 |
 | :---: | :---: |
-| ![Preliminary round rank](https://raw.githubusercontent.com/DinhNguyenSLK/salamanders/DinhNguyenSLK-image/assets/round1_aic_sotuyen.PNG)<br><br>![Preliminary round leaderboard](assets/rank_preliminary_2.png) | ![Final round rank](assets/rank_final.png) |
+| ![Preliminary round rank](https://raw.githubusercontent.com/DinhNguyenSLK/salamanders/DinhNguyenSLK-image/round1_aic_sotuyen.PNG)<br><br>![Preliminary round leaderboard](https://raw.githubusercontent.com/DinhNguyenSLK/salamanders/DinhNguyenSLK-image/round3_aic_sotuyen.PNG) | ![Final round rank](assets/rank_final.png) |
 | Repo ranking in the preliminary round | Qualified to compete in the final round |
 ---
 
